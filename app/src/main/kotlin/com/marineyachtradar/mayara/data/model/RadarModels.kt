@@ -1,0 +1,149 @@
+package com.marineyachtradar.mayara.data.model
+
+// ---------------------------------------------------------------------------
+// Connection
+// ---------------------------------------------------------------------------
+
+/** How the app connects to the radar server. */
+sealed interface ConnectionMode {
+    /** mayara-server runs in-process via JNI on localhost:[port]. */
+    data class Embedded(val port: Int = 6502, val emulator: Boolean = false) : ConnectionMode
+
+    /** Connect to a remote mayara-server or SignalK node. */
+    data class Network(val baseUrl: String) : ConnectionMode
+}
+
+data class DiscoveredServer(
+    val name: String,
+    val host: String,
+    val port: Int,
+    val isSignalK: Boolean,
+) {
+    val baseUrl: String get() = "http://$host:$port"
+}
+
+// ---------------------------------------------------------------------------
+// Radar discovery
+// ---------------------------------------------------------------------------
+
+data class RadarInfo(
+    val id: String,
+    val name: String,
+    val brand: String,
+    val spokeDataUrl: String,
+)
+
+// ---------------------------------------------------------------------------
+// Capabilities (from GET /radars/{id}/capabilities)
+// ---------------------------------------------------------------------------
+
+data class RadarCapabilities(
+    val radarId: String,
+    /** Available range steps in metres (ordered ascending). */
+    val ranges: List<Int>,
+    val spokesPerRevolution: Int,
+    val maxSpokeLength: Int,
+    val controls: Map<String, ControlDefinition>,
+)
+
+data class ControlDefinition(
+    val id: String,
+    val name: String,
+    val type: ControlType,
+    val minValue: Float? = null,
+    val maxValue: Float? = null,
+    val supportsAuto: Boolean = false,
+    val options: List<String> = emptyList(),
+)
+
+enum class ControlType { RANGE_SLIDER, ENUM, BOOLEAN }
+
+// ---------------------------------------------------------------------------
+// Spoke data (decoded from RadarMessage protobuf)
+// ---------------------------------------------------------------------------
+
+data class SpokeData(
+    /** Spoke angle in range [0, spokesPerRevolution). */
+    val angle: Int,
+    /** Optional true bearing in range [0, spokesPerRevolution). */
+    val bearing: Int?,
+    /** Range in metres of last pixel in [data]. */
+    val rangeMetres: Int,
+    /** Raw radar intensity bytes: index 0 = nearest, last = farthest. */
+    val data: ByteArray,
+) {
+    // ByteArray requires manual equals/hashCode to avoid identity comparison.
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is SpokeData) return false
+        return angle == other.angle &&
+                bearing == other.bearing &&
+                rangeMetres == other.rangeMetres &&
+                data.contentEquals(other.data)
+    }
+
+    override fun hashCode(): Int {
+        var result = angle
+        result = 31 * result + (bearing ?: 0)
+        result = 31 * result + rangeMetres
+        result = 31 * result + data.contentHashCode()
+        return result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UI State
+// ---------------------------------------------------------------------------
+
+/** Top-level state observed by all Compose screens. */
+sealed interface RadarUiState {
+    /** No connection yet / initial state. */
+    data object Loading : RadarUiState
+
+    /** Connection established; capabilities loaded; radar ready. */
+    data class Connected(
+        val radar: RadarInfo,
+        val capabilities: RadarCapabilities,
+        val controls: ControlsState,
+        val powerState: PowerState,
+        val currentRangeIndex: Int,
+        val navigationData: NavigationData?,
+    ) : RadarUiState
+
+    /** Server unreachable or fatal error. */
+    data class Error(val message: String) : RadarUiState
+}
+
+data class ControlsState(
+    val gain: SliderControlState,
+    val seaClutter: SliderControlState,
+    val rainClutter: SliderControlState?,   // null → not supported by radar
+    val interferenceRejection: EnumControlState?,
+    val palette: ColorPalette,
+    val orientation: RadarOrientation,
+)
+
+data class SliderControlState(
+    val value: Float,
+    val isAuto: Boolean,
+    val isSupported: Boolean = true,
+)
+
+data class EnumControlState(
+    val selectedIndex: Int,
+    val options: List<String>,
+)
+
+enum class PowerState {
+    OFF, WARMUP, STANDBY, TRANSMIT;
+}
+
+enum class ColorPalette { GREEN, YELLOW, MULTI_COLOR, NIGHT_RED }
+
+enum class RadarOrientation { HEAD_UP, NORTH_UP, COURSE_UP }
+
+data class NavigationData(
+    val headingDeg: Float?,
+    val sogKnots: Float?,
+    val cogDeg: Float?,
+)

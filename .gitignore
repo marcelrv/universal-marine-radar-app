@@ -1,0 +1,31 @@
+# Gradle user home
+.gradle/
+build/
+
+# Android Studio
+.idea/
+*.iml
+*.iws
+*.ipr
+local.properties
+captures/
+
+# JNI output — rebuilt by scripts/build_jni.sh
+app/src/main/jniLibs/arm64-v8a/libradar.so
+
+# Rust build artifacts
+mayara-jni/target/
+mayara-server/target/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Editor swap files
+*.swp
+*~
+
+# Wire generated sources (regenerated on every build)
+app/build/generated/source/wire/

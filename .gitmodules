@@ -1,0 +1,4 @@
+[submodule "mayara-server"]
+	path = mayara-server
+	url = https://github.com/marcelrv/mayara-server
+	branch = android

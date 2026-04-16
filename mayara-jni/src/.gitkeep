@@ -1,0 +1,3 @@
+# mayara-jni/src/ lives here — Rust JNI bridge source.
+# This directory should contain only lib.rs.
+# See ../../development_docs/agent_instructions.md for coding rules.
