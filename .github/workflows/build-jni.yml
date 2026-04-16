@@ -38,8 +38,9 @@ jobs:
       - name: Set up Android NDK
         uses: nttld/setup-ndk@v1
         with:
-          ndk-version: r30
+          ndk-version: r26.1.10909125
           add-to-path: true
+          local-cache: true
 
       - name: Verify Rust and cargo-ndk
         run: |
