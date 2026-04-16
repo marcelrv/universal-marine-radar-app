@@ -41,8 +41,35 @@ jobs:
           ndk-version: r30
           add-to-path: true
 
+      - name: Verify Rust and cargo-ndk
+        run: |
+          echo "==> Rust version:"
+          rustc --version && cargo --version
+          echo "==> cargo-ndk location:"
+          which cargo-ndk || echo "WARNING: cargo-ndk not in PATH"
+          echo "==> Android NDK:"
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+          if [ -d "$ANDROID_NDK_HOME" ]; then
+            echo "✓ NDK directory exists"
+            ls -la "$ANDROID_NDK_HOME/" | head -10
+          else
+            echo "✗ NDK directory NOT FOUND"
+            exit 1
+          fi
+          echo "==> Rust targets:"
+          rustup target list | grep aarch64-linux-android
+
+      - name: Verify submodule
+        run: |
+          echo "==> Submodule status:"
+          git submodule status
+          echo "==> mayara-server contents:"
+          ls -la mayara-server/ | head -10
+
       - name: Build JNI library (ARM64)
-        run: bash scripts/build_jni.sh
+        run: |
+          set -x  # Enable debug output
+          bash scripts/build_jni.sh
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
 
