@@ -29,6 +29,9 @@ anyhow = "1.0"
 # Shared state helpers
 once_cell = "1.21"
 
+# CLaP for CLI argument parsing (needed for Cli struct from mayara)
+clap = { version = "4", features = ["derive"] }
+
 # Axum is no longer needed directly in the JNI crate — the stub server was removed
 # when the full web server was integrated via mayara::server::start_android().
 # axum = { version = "0.8", features = ["json", "tokio", "ws"] }
