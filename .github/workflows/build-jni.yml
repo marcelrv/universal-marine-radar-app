@@ -1,0 +1,76 @@
+name: Build JNI Library (libradar.so)
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'mayara-jni/**'
+      - 'mayara-server/**'
+      - 'scripts/build_jni.sh'
+      - '.github/workflows/build-jni.yml'
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build-android-jni:
+    name: Build ARM64 JNI Library
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive  # Initialize mayara-server submodule
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Set up Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r30
+          add-to-path: true
+
+      - name: Build JNI library (ARM64)
+        run: bash scripts/build_jni.sh
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+
+      - name: Verify artifact
+        run: |
+          if [ -f app/src/main/jniLibs/arm64-v8a/libradar.so ]; then
+            echo "✅ libradar.so built successfully!"
+            ls -lh app/src/main/jniLibs/arm64-v8a/libradar.so
+            file app/src/main/jniLibs/arm64-v8a/libradar.so
+          else
+            echo "❌ libradar.so not found!"
+            exit 1
+          fi
+
+      - name: Upload JNI library artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libradar-so
+          path: app/src/main/jniLibs/arm64-v8a/libradar.so
+          retention-days: 90
+
+      - name: Commit and push libradar.so
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add app/src/main/jniLibs/arm64-v8a/libradar.so
+          git commit -m "build: libradar.so from GitHub Actions" || echo "No changes to commit"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
