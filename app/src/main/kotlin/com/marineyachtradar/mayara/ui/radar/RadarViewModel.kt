@@ -1,42 +1,50 @@
 package com.marineyachtradar.mayara.ui.radar
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.marineyachtradar.mayara.data.api.RadarApiClient
 import com.marineyachtradar.mayara.data.api.SignalKStreamClient
 import com.marineyachtradar.mayara.data.api.SpokeWebSocketClient
 import com.marineyachtradar.mayara.data.model.ColorPalette
+import com.marineyachtradar.mayara.data.model.ConnectionMode
 import com.marineyachtradar.mayara.data.model.PowerState
 import com.marineyachtradar.mayara.data.model.RadarOrientation
 import com.marineyachtradar.mayara.data.model.RadarUiState
+import com.marineyachtradar.mayara.domain.ConnectionManager
 import com.marineyachtradar.mayara.domain.RadarRepository
 import com.marineyachtradar.mayara.domain.UnitsPreferences
 import com.marineyachtradar.mayara.domain.mayaraDataStore
+import com.marineyachtradar.mayara.jni.RadarJni
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
+private const val TAG = "RadarViewModel"
+
 /**
  * ViewModel for [RadarScreen].
  *
- * Creates its own [RadarRepository] using [viewModelScope] so all coroutines are
- * cancelled automatically when the ViewModel is cleared.
+ * Startup logic:
+ * 1. Restore colour palette from DataStore.
+ * 2. Check [ConnectionManager] for a remembered connection mode.
+ * 3. If remembered: auto-connect (start JNI server if Embedded, then HTTP connect).
+ * 4. If not remembered: show [ConnectionPickerDialog].
  *
- * **Connection modes:**
- * - **Embedded (default)**: The JNI Rust server runs on 127.0.0.1:6502 inside the Android app itself.
- *   This requires Phase 1 (JNI) to be complete and the .so library to load successfully.
- * - **Network (Phase 5)**: User selects a remote mayara-server URL from Settings.
+ * **Embedded mode**: starts the Rust server via [RadarJni] on 127.0.0.1:6502
+ * then connects the HTTP/WebSocket client to that address.
+ * **Network mode**: connects directly to the provided URL.
  *
- * **NOTE (Phase 3):** At this stage, the embedded server may not be running yet (Phase 1 JNI
- * integration still in progress). The app will show "Connecting to radar…" and fail with a
- * connection error if the server is unreachable. This is expected until Phase 1 is complete.
+ * [RadarJni] is loaded lazily — if the JNI library is absent (e.g. x86_64 emulator)
+ * the error is caught and the app falls back to showing an error state rather than crashing.
  */
 class RadarViewModel(application: Application) : AndroidViewModel(application) {
 
     private val unitsPreferences = UnitsPreferences(application.mayaraDataStore)
+    private val connectionManager = ConnectionManager(application.mayaraDataStore)
 
     private val repository = RadarRepository(
         apiClient = RadarApiClient(EMBEDDED_BASE_URL),
@@ -60,20 +68,70 @@ class RadarViewModel(application: Application) : AndroidViewModel(application) {
     val showConnectionPicker: StateFlow<Boolean> = _showConnectionPicker.asStateFlow()
 
     init {
-        // Restore the persisted palette preference, then connect to the server.
         viewModelScope.launch {
+            // Restore saved colour palette first.
             val savedPalette = try {
                 unitsPreferences.colorPalette.first()
             } catch (_: Throwable) {
                 ColorPalette.GREEN
             }
             repository.setPalette(savedPalette)
+
+            // Check for a remembered connection; auto-connect if found.
+            val remembered = try { connectionManager.rememberedMode.first() } catch (_: Throwable) { null }
+            if (remembered != null) {
+                connectWithMode(remembered)
+            } else {
+                // No remembered choice → show the picker.
+                _showConnectionPicker.value = true
+            }
         }
-        // Attempt to connect to the embedded JNI server.
-        // If the JNI layer hasn't started the server yet, this will fail with a connection error,
-        // which [RadarRepository] will surface in [uiState] as [RadarUiState.Error].
-        // This is expected until Phase 1 (JNI integration) is fully verified.
-        repository.connect(EMBEDDED_BASE_URL)
+    }
+
+    /**
+     * Called when the user confirms a connection in [ConnectionPickerDialog].
+     *
+     * @param mode The chosen [ConnectionMode].
+     * @param remember Whether to persist the choice for future launches.
+     */
+    fun onConnect(mode: ConnectionMode, remember: Boolean) {
+        _showConnectionPicker.value = false
+        if (remember) {
+            viewModelScope.launch {
+                try { connectionManager.rememberMode(mode) } catch (_: Throwable) { /* ignore */ }
+            }
+        }
+        viewModelScope.launch { connectWithMode(mode) }
+    }
+
+    /**
+     * Start the JNI server (if Embedded) and connect the HTTP/WS client.
+     *
+     * Gracefully handles [UnsatisfiedLinkError] so the app does not crash on
+     * emulators where libradar.so is absent or incompatible.
+     */
+    private suspend fun connectWithMode(mode: ConnectionMode) {
+        when (mode) {
+            is ConnectionMode.Embedded -> {
+                val started = try {
+                    RadarJni.startServer(port = mode.port, emulator = mode.emulator)
+                } catch (e: UnsatisfiedLinkError) {
+                    Log.w(TAG, "libradar.so not available on this device: ${e.message}")
+                    false
+                } catch (e: Throwable) {
+                    Log.e(TAG, "Failed to start embedded radar server", e)
+                    false
+                }
+                if (!started) {
+                    Log.w(TAG, "Embedded server did not start; connecting anyway (may fail)")
+                }
+                val url = "http://127.0.0.1:${mode.port}"
+                repository.connect(url)
+            }
+            is ConnectionMode.Network -> {
+                repository.connect(mode.baseUrl)
+            }
+        }
     }
 
     // ------------------------------------------------------------------
@@ -110,9 +168,6 @@ class RadarViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Zoom in: step to the next smaller range (lower index in capabilities.ranges).
-     *
-     * [RadarCapabilities.ranges] is ordered ascending (smallest range first), so
-     * "zoom in" means decreasing the index.
      */
     fun onRangeUp() {
         val state = uiState.value as? RadarUiState.Connected ?: return
@@ -178,18 +233,7 @@ class RadarViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     companion object {
-        /**
-         * Embedded JNI server address.
-         *
-         * The Rust server (mayara-jni) runs inside the Android process and listens on
-         * 127.0.0.1:6502 (process-local loopback).
-         *
-         * **On physical device:** 127.0.0.1 = the device itself (not the dev machine).
-         * **On emulator:** 10.0.2.2 can be used instead to reach the host machine (not applicable here).
-         *
-         * This URL is hardcoded for embedded mode. Phase 5 (Settings) will allow users to
-         * switch to a remote server URL.
-         */
+        /** Default embedded JNI server URL (used as the initial apiClient placeholder). */
         const val EMBEDDED_BASE_URL = "http://127.0.0.1:6502"
     }
 }

@@ -16,9 +16,11 @@ import com.marineyachtradar.mayara.data.model.RadarInfo
 import com.marineyachtradar.mayara.data.model.RadarOrientation
 import com.marineyachtradar.mayara.data.model.RadarUiState
 import com.marineyachtradar.mayara.data.model.SliderControlState
+import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
@@ -74,6 +76,8 @@ class RadarRepositoryTest {
         // Default: spoke and stream flows emit nothing
         every { spokeClient.connect(any()) } returns emptyFlow()
         every { streamClient.connect(any()) } returns emptyFlow()
+        // Allow the repository to update baseUrl on connect()
+        every { apiClient.baseUrl = any() } just Runs
     }
 
     private fun buildRepository() = RadarRepository(

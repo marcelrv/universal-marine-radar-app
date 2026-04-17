@@ -183,9 +183,8 @@ fun RadarScreen(
         if (showConnectionPicker) {
             ConnectionPickerDialog(
                 discoveredServers = emptyList(), // Phase 5: wire MdnsScanner
-                onConnect = { mode, _ ->
-                    // Phase 5: persist via ConnectionManager when remember=true
-                    viewModel.onDismissConnectionPicker()
+                onConnect = { mode, remember ->
+                    viewModel.onConnect(mode, remember)
                 },
                 onDismiss = { viewModel.onDismissConnectionPicker() },
             )

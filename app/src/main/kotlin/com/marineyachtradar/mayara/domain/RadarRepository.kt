@@ -73,6 +73,7 @@ class RadarRepository(
      * on success or [RadarUiState.Error] on failure.
      */
     fun connect(baseUrl: String) {
+        apiClient.baseUrl = baseUrl
         disconnect()
         _uiState.value = RadarUiState.Loading
         scope.launch {

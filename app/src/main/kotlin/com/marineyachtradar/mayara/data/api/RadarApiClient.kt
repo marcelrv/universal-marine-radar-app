@@ -27,9 +27,11 @@ import java.util.concurrent.TimeUnit
  * @param client OkHttp client (injectable for testing).
  */
 class RadarApiClient(
-    private val baseUrl: String,
+    baseUrl: String,
     private val client: OkHttpClient = defaultClient(),
 ) {
+    /** Mutable so [RadarRepository] can redirect the client when the connection URL changes. */
+    var baseUrl: String = baseUrl
 
     companion object {
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
