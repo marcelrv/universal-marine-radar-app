@@ -64,10 +64,15 @@ android {
 // the wire block will error: run `git submodule update --init`.
 wire {
     kotlin {
-        android = true
+        // android = false: generates plain Message subclasses (no Parcelable).
+        // SpokeData is the domain model; RadarMessage is only used for decoding.
+        android = false
     }
     sourcePath {
-        srcDir("../mayara-server/src/lib/protos")
+        // Local copy of the server proto with java_package option set so Wire
+        // generates into a named package (default-package classes can't be
+        // imported from named packages as compiled classes on the classpath).
+        srcDir("src/main/proto")
     }
 }
 
@@ -113,10 +118,13 @@ dependencies {
     // Unit tests (JVM)
     testImplementation(libs.junit5.api)
     testRuntimeOnly(libs.junit5.engine)
+    testRuntimeOnly(libs.junit5.launcher)
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
+    // org.json is provided by Android runtime; this JAR enables JVM unit tests
+    testImplementation("org.json:json:20231013")
 
     // Instrumented tests
     androidTestImplementation(libs.compose.ui.test.junit4)

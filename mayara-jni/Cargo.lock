@@ -1677,6 +1677,7 @@ version = "0.1.0"
 dependencies = [
  "android_logger",
  "anyhow",
+ "clap",
  "jni",
  "log",
  "mayara",

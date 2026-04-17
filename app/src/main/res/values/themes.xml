@@ -2,10 +2,11 @@
 <resources>
     <!-- App theme: fully transparent so Compose controls all drawing.
          The radar canvas uses a dark charcoal background (#0B0C10) defined in MayaraTheme.kt -->
-    <style name="Theme.Mayara" parent="android:Theme.Material.NoTitleBar.Fullscreen">
+    <!-- Use Theme.Material.NoActionBar (API 21+) as parent; fullscreen handled via item -->
+    <style name="Theme.Mayara" parent="@android:style/Theme.Material.NoActionBar">
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:statusBarColor">@android:color/black</item>
         <item name="android:navigationBarColor">@android:color/black</item>
-        <item name="android:windowKeepScreenOn">true</item>
+        <item name="android:windowFullscreen">true</item>
     </style>
 </resources>

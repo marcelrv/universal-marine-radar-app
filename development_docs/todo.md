@@ -56,18 +56,18 @@
 
 ---
 
-## Phase 2 — Network Client & Data Layer
+## Phase 2 — Network Client & Data Layer ✅ COMPLETE
 
-- [ ] Add `wire-gradle-plugin` to `app/build.gradle.kts`; configure `.proto` source from submodule path
-- [ ] Verify protobuf codegen produces `RadarMessage` Kotlin class
-- [ ] Write `RadarApiClient.kt`: `getRadars()`, `getCapabilities(id)`, `putControl(id, cid, value)`
-- [ ] Write `SpokeWebSocketClient.kt`: WS connect, binary proto decode, `Flow<SpokeData>`
-- [ ] Write `MdnsScanner.kt`: `NsdManager` scan for `_signalk-ws._tcp` and `_mayara._tcp`
-- [ ] Write `ConnectionManager.kt`: `ConnectionMode` sealed class, persist via DataStore
-- [ ] Write `RadarRepository.kt`: `StateFlow<RadarUiState>` aggregating REST + WS + JNI state
-- [ ] Write `CapabilitiesMapper.kt`: maps capabilities JSON to `List<ControlDefinition>`
-- [ ] Write JVM unit tests for all data-layer classes (Layer 3 in testing plan)
-- [ ] `./gradlew test` passes all data-layer tests
+- [x] Add `wire-gradle-plugin` to `app/build.gradle.kts`; configure `.proto` source from submodule path
+- [x] Verify protobuf codegen produces `RadarMessage` Kotlin class (pkg `com.marineyachtradar.mayara.proto`)
+- [x] Write `RadarApiClient.kt`: `getRadars()`, `getCapabilities(id)`, `putControl(id, cid, value)`
+- [x] Write `SpokeWebSocketClient.kt`: WS connect, binary proto decode, `Flow<SpokeData>`
+- [x] Write `MdnsScanner.kt`: `NsdManager` scan for `_signalk-ws._tcp` and `_mayara._tcp`
+- [x] Write `ConnectionManager.kt`: `ConnectionMode` sealed class, persist via DataStore
+- [x] Write `RadarRepository.kt`: `StateFlow<RadarUiState>` aggregating REST + WS + JNI state
+- [x] Write `CapabilitiesMapper.kt`: maps capabilities JSON to `List<ControlDefinition>`
+- [x] Write JVM unit tests for all data-layer classes (Layer 3 in testing plan)
+- [x] `./gradlew test` passes all data-layer tests — **44 tests, 0 failures**
 
 ---
 

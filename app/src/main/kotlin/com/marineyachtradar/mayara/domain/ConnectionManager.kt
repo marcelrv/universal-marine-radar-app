@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.marineyachtradar.mayara.data.model.ConnectionMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.net.URI
 
 /**
  * Manages the active connection mode (Embedded vs Network) and persists the user's
@@ -50,7 +51,7 @@ class ConnectionManager(
                 }
                 is ConnectionMode.Network -> {
                     prefs[KEY_MODE] = NETWORK_VALUE
-                    val uri = android.net.Uri.parse(mode.baseUrl)
+                    val uri = URI(mode.baseUrl)
                     prefs[KEY_REMEMBERED_HOST] = uri.host ?: ""
                     prefs[KEY_REMEMBERED_PORT] = (uri.port.takeIf { it > 0 } ?: 6502).toString()
                 }
