@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.marineyachtradar.mayara.data.model.BearingMode
+import com.marineyachtradar.mayara.data.model.ColorPalette
 import com.marineyachtradar.mayara.data.model.DistanceUnit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -110,5 +111,46 @@ class UnitsPreferencesTest {
 
         val rawValue = dataStore.data.first()[stringPreferencesKey("distance_unit")]
         assertEquals(null, rawValue)
+    }
+
+    // ── colorPalette ─────────────────────────────────────────────────────
+
+    @Test
+    fun `colorPalette returns GREEN by default when no value stored`() = runTest {
+        val result = prefs.colorPalette.first()
+        assertEquals(ColorPalette.GREEN, result)
+    }
+
+    @Test
+    fun `saveColorPalette persists NIGHT_RED`() = runTest {
+        prefs.saveColorPalette(ColorPalette.NIGHT_RED)
+
+        val result = prefs.colorPalette.first()
+        assertEquals(ColorPalette.NIGHT_RED, result)
+    }
+
+    @Test
+    fun `saveColorPalette persists YELLOW`() = runTest {
+        prefs.saveColorPalette(ColorPalette.YELLOW)
+
+        val result = prefs.colorPalette.first()
+        assertEquals(ColorPalette.YELLOW, result)
+    }
+
+    @Test
+    fun `saveColorPalette persists MULTI_COLOR`() = runTest {
+        prefs.saveColorPalette(ColorPalette.MULTI_COLOR)
+
+        val result = prefs.colorPalette.first()
+        assertEquals(ColorPalette.MULTI_COLOR, result)
+    }
+
+    @Test
+    fun `resetToDefaults clears color_palette key so GREEN is returned`() = runTest {
+        prefs.saveColorPalette(ColorPalette.NIGHT_RED)
+
+        prefs.resetToDefaults()
+
+        assertEquals(ColorPalette.GREEN, prefs.colorPalette.first())
     }
 }

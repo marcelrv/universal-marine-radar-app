@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Adaptive icon foreground layer — radar PPI display face.
+
+    Visual design:
+    - Centre crosshair (thin lines)
+    - Three concentric range rings (10%, 30%, 50% radius from centre)
+    - Outer ring at ~80% radius (main display edge)
+    - One radar sweep arc (roughly 45° sector filled with fading green)
+    - Sweep line radiating from centre
+
+    All coordinates are in the 108×108dp viewport (safe zone: 12–96dp).
+    The "safe zone" for adaptive icons is the inner 72×72dp (18dp inset each side).
+    Centre = (54, 54).
+
+    Colour palette:
+      Primary radar green :  #00E676  (bright)
+      Dim radar green     :  #004D2C  (ring fill ghost)
+      Sweep sector alpha  :  #6000E676 → represented as separate overlay paths
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- ── Outer display ring (radius 42) ── -->
+    <path
+        android:strokeColor="#00C853"
+        android:strokeWidth="1.5"
+        android:fillColor="#00000000"
+        android:pathData="M 54,12
+                          A 42,42 0 1,1 53.99,12 Z" />
+
+    <!-- ── Range ring 3 (radius 31) ── -->
+    <path
+        android:strokeColor="#1A7A3F"
+        android:strokeWidth="0.8"
+        android:fillColor="#00000000"
+        android:pathData="M 54,23
+                          A 31,31 0 1,1 53.99,23 Z" />
+
+    <!-- ── Range ring 2 (radius 20) ── -->
+    <path
+        android:strokeColor="#1A7A3F"
+        android:strokeWidth="0.8"
+        android:fillColor="#00000000"
+        android:pathData="M 54,34
+                          A 20,20 0 1,1 53.99,34 Z" />
+
+    <!-- ── Range ring 1 (radius 10) ── -->
+    <path
+        android:strokeColor="#1A7A3F"
+        android:strokeWidth="0.6"
+        android:fillColor="#00000000"
+        android:pathData="M 54,44
+                          A 10,10 0 1,1 53.99,44 Z" />
+
+    <!-- ── Crosshair — horizontal ── -->
+    <path
+        android:strokeColor="#1A7A3F"
+        android:strokeWidth="0.6"
+        android:pathData="M 12,54 L 96,54" />
+
+    <!-- ── Crosshair — vertical ── -->
+    <path
+        android:strokeColor="#1A7A3F"
+        android:strokeWidth="0.6"
+        android:pathData="M 54,12 L 54,96" />
+
+    <!--
+        ── Sweep sector (0° = North = 12 o'clock, clockwise ≈ 45°) ──
+        Sector from 315° to 360° (NW quadrant sweep):
+          Start angle -45° from top: x = 54 + 42*sin(-45°) = 54 - 29.7 ≈ 24.3, y = 54 - 42*cos(-45°) ≈ 24.3
+          End = top of circle = (54, 12)
+
+        Using a pie-slice path:
+          M centre → start of arc → arc → back to centre (filled)
+    -->
+    <path
+        android:fillColor="#3300C853"
+        android:pathData="M 54,54
+                          L 24.3,24.3
+                          A 42,42 0 0,1 54,12
+                          Z" />
+
+    <!-- ── Sweep line (from centre to outer ring, pointing NNW ≈ 315°) ── -->
+    <path
+        android:strokeColor="#00E676"
+        android:strokeWidth="1.8"
+        android:pathData="M 54,54 L 24.3,24.3" />
+
+    <!-- ── Centre dot ── -->
+    <path
+        android:fillColor="#00E676"
+        android:pathData="M 54,54
+                          m -3,0
+                          A 3,3 0 1,1 57,54
+                          A 3,3 0 1,1 51,54 Z" />
+
+    <!-- ── Bright echo blips — simulate radar returns ── -->
+    <!-- Upper-right quadrant blip -->
+    <path
+        android:fillColor="#00E676"
+        android:pathData="M 71,36
+                          A 2,2 0 1,1 73,36
+                          A 2,2 0 1,1 71,36 Z" />
+
+    <!-- Lower-right blip -->
+    <path
+        android:fillColor="#00C853"
+        android:pathData="M 76,65
+                          A 1.5,1.5 0 1,1 77.5,65
+                          A 1.5,1.5 0 1,1 76,65 Z" />
+
+    <!-- Upper-left small blip -->
+    <path
+        android:fillColor="#00C853"
+        android:pathData="M 38,42
+                          A 1.2,1.2 0 1,1 39.2,42
+                          A 1.2,1.2 0 1,1 38,42 Z" />
+
+</vector>

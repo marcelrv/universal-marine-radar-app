@@ -27,3 +27,19 @@
 # ---- Kotlin ----
 -keepattributes *Annotation*, Signature, Exception
 -keep class kotlin.Metadata { *; }
+
+# ---- DataStore / Preferences ----
+-keep class androidx.datastore.** { *; }
+-dontwarn androidx.datastore.**
+
+# ---- Kotlin Coroutines ----
+-keepnames class kotlinx.coroutines.** { *; }
+-dontwarn kotlinx.coroutines.**
+
+# ---- AndroidX Lifecycle / ViewModel ----
+-keep class androidx.lifecycle.** { *; }
+-dontwarn androidx.lifecycle.**
+
+# ---- Compose Navigation ----
+-keep class androidx.navigation.** { *; }
+-dontwarn androidx.navigation.**

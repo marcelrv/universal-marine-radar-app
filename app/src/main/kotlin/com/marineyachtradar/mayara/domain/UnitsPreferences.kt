@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.marineyachtradar.mayara.data.model.BearingMode
+import com.marineyachtradar.mayara.data.model.ColorPalette
 import com.marineyachtradar.mayara.data.model.DistanceUnit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -33,6 +34,7 @@ class UnitsPreferences(
     companion object {
         internal val KEY_DISTANCE_UNIT = stringPreferencesKey("distance_unit")
         internal val KEY_BEARING_MODE = stringPreferencesKey("bearing_mode")
+        internal val KEY_COLOR_PALETTE = stringPreferencesKey("color_palette")
     }
 
     /**
@@ -63,6 +65,18 @@ class UnitsPreferences(
         }
     }
 
+    /**
+     * Emits the current radar color palette. Defaults to [ColorPalette.GREEN] if not set.
+     */
+    val colorPalette: Flow<ColorPalette> = dataStore.data.map { prefs ->
+        when (prefs[KEY_COLOR_PALETTE]) {
+            ColorPalette.YELLOW.name -> ColorPalette.YELLOW
+            ColorPalette.MULTI_COLOR.name -> ColorPalette.MULTI_COLOR
+            ColorPalette.NIGHT_RED.name -> ColorPalette.NIGHT_RED
+            else -> ColorPalette.GREEN
+        }
+    }
+
     /** Persist the chosen bearing mode. */
     suspend fun saveBearingMode(mode: BearingMode) {
         dataStore.edit { prefs ->
@@ -70,11 +84,19 @@ class UnitsPreferences(
         }
     }
 
-    /** Reset both preferences to factory defaults ([DistanceUnit.NM], [BearingMode.TRUE]). */
+    /** Persist the chosen color palette across app restarts. */
+    suspend fun saveColorPalette(palette: ColorPalette) {
+        dataStore.edit { prefs ->
+            prefs[KEY_COLOR_PALETTE] = palette.name
+        }
+    }
+
+    /** Reset all preferences to factory defaults. */
     suspend fun resetToDefaults() {
         dataStore.edit { prefs ->
             prefs.remove(KEY_DISTANCE_UNIT)
             prefs.remove(KEY_BEARING_MODE)
+            prefs.remove(KEY_COLOR_PALETTE)
         }
     }
 }

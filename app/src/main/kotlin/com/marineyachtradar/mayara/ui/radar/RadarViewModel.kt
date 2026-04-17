@@ -1,6 +1,7 @@
 package com.marineyachtradar.mayara.ui.radar
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.marineyachtradar.mayara.data.api.RadarApiClient
 import com.marineyachtradar.mayara.data.api.SignalKStreamClient
@@ -10,9 +11,13 @@ import com.marineyachtradar.mayara.data.model.PowerState
 import com.marineyachtradar.mayara.data.model.RadarOrientation
 import com.marineyachtradar.mayara.data.model.RadarUiState
 import com.marineyachtradar.mayara.domain.RadarRepository
+import com.marineyachtradar.mayara.domain.UnitsPreferences
+import com.marineyachtradar.mayara.domain.mayaraDataStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /**
  * ViewModel for [RadarScreen].
@@ -29,7 +34,9 @@ import kotlinx.coroutines.flow.asStateFlow
  * integration still in progress). The app will show "Connecting to radar…" and fail with a
  * connection error if the server is unreachable. This is expected until Phase 1 is complete.
  */
-class RadarViewModel : ViewModel() {
+class RadarViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val unitsPreferences = UnitsPreferences(application.mayaraDataStore)
 
     private val repository = RadarRepository(
         apiClient = RadarApiClient(EMBEDDED_BASE_URL),
@@ -53,6 +60,15 @@ class RadarViewModel : ViewModel() {
     val showConnectionPicker: StateFlow<Boolean> = _showConnectionPicker.asStateFlow()
 
     init {
+        // Restore the persisted palette preference, then connect to the server.
+        viewModelScope.launch {
+            val savedPalette = try {
+                unitsPreferences.colorPalette.first()
+            } catch (_: Throwable) {
+                ColorPalette.GREEN
+            }
+            repository.setPalette(savedPalette)
+        }
         // Attempt to connect to the embedded JNI server.
         // If the JNI layer hasn't started the server yet, this will fail with a connection error,
         // which [RadarRepository] will surface in [uiState] as [RadarUiState.Error].
@@ -148,6 +164,9 @@ class RadarViewModel : ViewModel() {
 
     fun onPaletteChange(palette: ColorPalette) {
         repository.setPalette(palette)
+        viewModelScope.launch {
+            try { unitsPreferences.saveColorPalette(palette) } catch (_: Throwable) { /* ignore */ }
+        }
     }
 
     fun onOrientationChange(orientation: RadarOrientation) {

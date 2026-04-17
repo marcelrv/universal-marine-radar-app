@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Adaptive icon background layer.
+    Deep navy circle — evokes a radar PPI display bezel.
+    The full 108×108dp adaptive icon safe zone is a circle; using a rect fill here
+    because the OS clips it to a circle/squircle depending on the device launcher.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Deep navy background -->
+    <path
+        android:fillColor="#0A1628"
+        android:pathData="M0,0 h108 v108 h-108 z" />
+
+</vector>
