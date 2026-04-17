@@ -19,7 +19,10 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
+            // arm64-v8a: production (physical devices).
+            // x86_64: included so the debug APK can be installed on the CI x86_64 AVD.
             abiFilters += "arm64-v8a"
+            abiFilters += "x86_64"
         }
     }
 

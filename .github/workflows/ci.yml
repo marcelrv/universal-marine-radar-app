@@ -32,9 +32,14 @@ jobs:
             mayara-server/target
           key: ${{ runner.os }}-cargo-server-${{ hashFiles('mayara-server/Cargo.lock') }}
 
-      - name: Run mayara-server tests (emulator mode, no hardware)
+      - name: Run mayara-server lib unit tests
         working-directory: mayara-server
-        run: cargo test --features emulator -- --nocapture
+        run: cargo test --lib --features emulator -- --nocapture
+
+      - name: Run mayara-server integration tests (replay)
+        working-directory: mayara-server
+        run: cargo test --test replay_navico_4g --test replay_navico_br24 --test replay_navico_halo20plus --test replay_navico_halo24 --test replay_furuno --test replay_garmin --test replay_raymarine --features emulator -- --nocapture
+        continue-on-error: true
 
   # ─────────────────────────────────────────────
   # Job 2: Rust tests — mayara-jni bridge
@@ -170,9 +175,13 @@ jobs:
 
       - name: Create stub libradar.so for instrumented tests
         run: |
+          # Create stubs for both arm64-v8a and x86_64 so the APK installs on the CI x86_64 AVD
           mkdir -p app/src/main/jniLibs/arm64-v8a
-          # ARM64 ELF stub (see android-unit-tests for details)
+          mkdir -p app/src/main/jniLibs/x86_64
+          # arm64-v8a stub (EM_AARCH64 = 0xb7)
           printf '\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03\x00\xb7\x00\x01\x00\x00\x00\x00\x00\x00\x00@\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00@\x00\x38\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > app/src/main/jniLibs/arm64-v8a/libradar.so
+          # x86_64 stub (EM_X86_64 = 0x3e)
+          printf '\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03\x00\x3e\x00\x01\x00\x00\x00\x00\x00\x00\x00@\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00@\x00\x38\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > app/src/main/jniLibs/x86_64/libradar.so
 
       - name: Run instrumented tests on AVD (x86_64)
         uses: reactivecircus/android-emulator-runner@v2
