@@ -2,6 +2,7 @@ package com.marineyachtradar.mayara.ui.radar
 
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
+import android.util.Log
 import com.marineyachtradar.mayara.data.model.ColorPalette
 import com.marineyachtradar.mayara.data.model.SpokeData
 import java.nio.ByteBuffer
@@ -110,6 +111,9 @@ void main() {
 
     private var viewportWidth = 1
     private var viewportHeight = 1
+
+    /** False until [onSurfaceCreated] completes without error. Guards all draw calls. */
+    @Volatile private var glInitialized = false
 
     // -----------------------------------------------------------------------
     // Radar texture buffer (written from any thread, uploaded on GL thread)
@@ -228,6 +232,15 @@ void main() {
     // =======================================================================
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        try {
+            initGL()
+        } catch (e: Throwable) {
+            Log.e("RadarGLRenderer", "GL initialisation failed — radar rendering unavailable", e)
+            // Do NOT re-throw: an uncaught exception in the GL thread crashes the process.
+        }
+    }
+
+    private fun initGL() {
         GLES20.glClearColor(0.043f, 0.047f, 0.063f, 1.0f)  // #0B0C10
 
         programHandle = buildProgram(VERTEX_SHADER, FRAGMENT_SHADER)
@@ -273,9 +286,11 @@ void main() {
             quadVertices,
             GLES20.GL_STATIC_DRAW
         )
+        glInitialized = true
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        if (!glInitialized) return
         GLES20.glViewport(0, 0, width, height)
         viewportWidth  = width
         viewportHeight = height
@@ -283,6 +298,7 @@ void main() {
 
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+        if (!glInitialized) return
 
         // Upload palette if changed
         if (paletteDirty.compareAndSet(true, false)) {
