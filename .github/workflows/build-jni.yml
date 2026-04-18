@@ -136,7 +136,7 @@ jobs:
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git add app/src/main/jniLibs/arm64-v8a/libradar.so
+          git add -f app/src/main/jniLibs/arm64-v8a/libradar.so
           git diff --cached --exit-code \
             || git commit -m "build: update libradar.so [skip ci]"
           git push || echo "Nothing to push"
