@@ -32,28 +32,25 @@ jobs:
         with:
           targets: aarch64-linux-android
 
-      # ubuntu-latest has NDK pre-installed at $ANDROID_HOME/ndk/.
-      # We prefer 26.3.11579264; fall back to any available NDK if absent.
+      # ubuntu-24.04 runners pre-install NDK 27/28/29 and set ANDROID_NDK_HOME.
+      # Prefer the pre-set value; fall back to scanning $ANDROID_HOME/ndk/.
       - name: Locate Android NDK
         id: ndk
         run: |
-          PREFERRED_NDK="26.3.11579264"
-          NDK_DIR="${ANDROID_HOME}/ndk/${PREFERRED_NDK}"
-
-          if [ ! -d "${NDK_DIR}" ]; then
-            echo "NDK ${PREFERRED_NDK} not pre-installed; trying sdkmanager..."
-            sdkmanager "ndk;${PREFERRED_NDK}" || true
+          # Re-export so the value persists across all subsequent steps via GITHUB_ENV.
+          if [ -n "${ANDROID_NDK_HOME}" ] && [ -d "${ANDROID_NDK_HOME}" ]; then
+            echo "Using pre-set ANDROID_NDK_HOME: ${ANDROID_NDK_HOME}"
+            echo "ANDROID_NDK_HOME=${ANDROID_NDK_HOME}" >> "${GITHUB_ENV}"
+            exit 0
           fi
 
-          if [ ! -d "${NDK_DIR}" ]; then
-            echo "Falling back to any available NDK..."
-            NDK_DIR=$(ls -d "${ANDROID_HOME}/ndk/"*/ 2>/dev/null \
-              | sort -V | tail -1 | sed 's|/$||')
-          fi
+          # Fallback: pick the highest version available under $ANDROID_HOME/ndk/.
+          NDK_DIR=$(ls -d "${ANDROID_HOME}/ndk/"*/ 2>/dev/null \
+            | sort -V | tail -1 | sed 's|/$||')
 
           if [ -z "${NDK_DIR}" ] || [ ! -d "${NDK_DIR}" ]; then
             echo "ERROR: No Android NDK found." >&2
-            echo "Available directories under \$ANDROID_HOME/ndk/:"
+            echo "Available under \$ANDROID_HOME/ndk/:"
             ls -la "${ANDROID_HOME}/ndk/" 2>/dev/null || echo "  (empty or missing)"
             exit 1
           fi
@@ -138,6 +135,10 @@ jobs:
           git add app/src/main/jniLibs/arm64-v8a/libradar.so
           git diff --cached --exit-code \
             || git commit -m "build: update libradar.so [skip ci]"
+          git push || echo "Nothing to push"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+r.so [skip ci]"
           git push || echo "Nothing to push"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
