@@ -254,6 +254,20 @@ async fn run_server(port: u16, emulator: bool, pcap_path: String, shutdown_rx: o
     }
     let cli = mayara::Cli::parse_from(args);
 
+    // Initialize replay *before* start_android so that:
+    //   1. replay::is_active() returns true during Persistence::new() (avoiding
+    //      a panic when directories::ProjectDirs is unavailable on Android), and
+    //   2. start_session() actually starts the PcapReplay subsystem.
+    if !pcap_path.is_empty() {
+        mayara::network::set_replay(true);
+        if let Err(e) = mayara::replay::init(std::path::Path::new(&pcap_path)) {
+            let msg = format!("[ERROR] Failed to initialize pcap replay from '{pcap_path}': {e}");
+            error!("{}", msg);
+            append_log(msg);
+            return Err(anyhow::anyhow!(e));
+        }
+    }
+
     append_log(format!(
         "[INFO] Starting full mayara server (port={port}, emulator={emulator}, pcap='{pcap_path}')"
     ));

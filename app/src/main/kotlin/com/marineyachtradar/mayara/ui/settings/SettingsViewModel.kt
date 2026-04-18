@@ -68,6 +68,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                             rememberedPort = port,
                         )
                     }
+                    is ConnectionMode.PcapDemo -> ConnectionSettingsState(
+                        activeMode = mode,
+                        displayLabel = "PCAP Demo: ${java.io.File(mode.pcapPath).name}",
+                    )
                     null -> ConnectionSettingsState()
                 }
             }

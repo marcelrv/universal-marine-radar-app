@@ -55,6 +55,9 @@ class ConnectionManager(
                     prefs[KEY_REMEMBERED_HOST] = uri.host ?: ""
                     prefs[KEY_REMEMBERED_PORT] = (uri.port.takeIf { it > 0 } ?: 6502).toString()
                 }
+                is ConnectionMode.PcapDemo -> {
+                    // PCAP demo is not persisted across restarts (file path may be temporary)
+                }
             }
         }
     }
