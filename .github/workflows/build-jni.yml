@@ -14,7 +14,7 @@ on:
     branches:
       - main
       - develop
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
 
 jobs:
   build-android-jni:
@@ -25,41 +25,43 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          submodules: recursive  # Initialize mayara-server submodule
+          submodules: recursive
 
-      - name: Install Rust
+      - name: Install Rust with Android target
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: "17"
-          distribution: "temurin"
-
-      - name: Set up Android SDK (includes NDK)
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses || true
-
-      - name: Install NDK r26 via sdkmanager
+      # ubuntu-latest has NDK pre-installed at $ANDROID_HOME/ndk/.
+      # We prefer 26.3.11579264; fall back to any available NDK if absent.
+      - name: Locate Android NDK
+        id: ndk
         run: |
-          sdkmanager "ndk;26.3.11579264" 2>/dev/null || sdkmanager "ndk;26.1.10909125" 2>/dev/null || true
-          NDK_PATH=$(ls -d ${ANDROID_SDK_ROOT}/ndk/26.* 2>/dev/null | sort -V | tail -1)
-          if [ -z "$NDK_PATH" ]; then
-            NDK_PATH=$(ls -d ${ANDROID_HOME}/ndk/26.* 2>/dev/null | sort -V | tail -1)
+          PREFERRED_NDK="26.3.11579264"
+          NDK_DIR="${ANDROID_HOME}/ndk/${PREFERRED_NDK}"
+
+          if [ ! -d "${NDK_DIR}" ]; then
+            echo "NDK ${PREFERRED_NDK} not pre-installed; trying sdkmanager..."
+            sdkmanager "ndk;${PREFERRED_NDK}" || true
           fi
-          if [ -z "$NDK_PATH" ]; then
-            echo "ERROR: No NDK r26 found after installation"
-            ls ${ANDROID_SDK_ROOT}/ndk/ 2>/dev/null || echo "No NDK directory"
+
+          if [ ! -d "${NDK_DIR}" ]; then
+            echo "Falling back to any available NDK..."
+            NDK_DIR=$(ls -d "${ANDROID_HOME}/ndk/"*/ 2>/dev/null \
+              | sort -V | tail -1 | sed 's|/$||')
+          fi
+
+          if [ -z "${NDK_DIR}" ] || [ ! -d "${NDK_DIR}" ]; then
+            echo "ERROR: No Android NDK found." >&2
+            echo "Available directories under \$ANDROID_HOME/ndk/:"
+            ls -la "${ANDROID_HOME}/ndk/" 2>/dev/null || echo "  (empty or missing)"
             exit 1
           fi
-          echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
-          echo "NDK found at: $NDK_PATH"
 
-      - name: Cache cargo registry and target
+          echo "Using NDK at: ${NDK_DIR}"
+          echo "ANDROID_NDK_HOME=${NDK_DIR}" >> "${GITHUB_ENV}"
+
+      - name: Cache Cargo registry and build artefacts
         uses: actions/cache@v4
         with:
           path: |
@@ -76,51 +78,51 @@ jobs:
         id: cache-cargo-ndk
         with:
           path: ~/.cargo/bin/cargo-ndk
-          key: ${{ runner.os }}-cargo-ndk-bin-v1
+          key: ${{ runner.os }}-cargo-ndk-bin-v4
 
       - name: Install cargo-ndk
         if: steps.cache-cargo-ndk.outputs.cache-hit != 'true'
-        run: cargo install cargo-ndk --locked
+        run: cargo install cargo-ndk
 
       - name: Verify build environment
         run: |
           echo "=== Rust toolchain ==="
           rustc --version
           cargo --version
-          rustup target list | grep aarch64-linux-android
+          rustup target list --installed | grep aarch64-linux-android \
+            || { echo "ERROR: aarch64-linux-android target not installed" >&2; exit 1; }
 
-          echo ""
-          echo "=== Build tools ==="
-          cargo-ndk --version
+          echo "=== cargo-ndk ==="
+          cargo ndk --version
 
-          echo ""
           echo "=== Android NDK ==="
-          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
-          test -d "$ANDROID_NDK_HOME" || (echo "ERROR: NDK not found at $ANDROID_NDK_HOME" && exit 1)
+          echo "ANDROID_NDK_HOME=${ANDROID_NDK_HOME}"
+          test -d "${ANDROID_NDK_HOME}" \
+            || { echo "ERROR: NDK not found at ${ANDROID_NDK_HOME}" >&2; exit 1; }
 
-          echo ""
           echo "=== Git submodule ==="
           git submodule status
-          test -d "mayara-server/src" || (echo "ERROR: mayara-server not initialized" && exit 1)
+          test -d mayara-server/src \
+            || { echo "ERROR: mayara-server submodule not initialised" >&2; exit 1; }
 
-      - name: Build JNI library (ARM64)
-        run: bash scripts/build_jni.sh
+      - name: Build libradar.so (ARM64)
+        run: |
+          cd mayara-jni
+          cargo ndk --target aarch64-linux-android --platform 26 -- build --release
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
           RUST_BACKTRACE: full
 
-      - name: Verify artifact
+      - name: Copy artifact into jniLibs
         run: |
-          if [ -f app/src/main/jniLibs/arm64-v8a/libradar.so ]; then
-            echo "✅ libradar.so built successfully!"
-            ls -lh app/src/main/jniLibs/arm64-v8a/libradar.so
-            file app/src/main/jniLibs/arm64-v8a/libradar.so
-          else
-            echo "❌ libradar.so not found!"
-            exit 1
-          fi
+          mkdir -p app/src/main/jniLibs/arm64-v8a
+          cp mayara-jni/target/aarch64-linux-android/release/libradar.so \
+             app/src/main/jniLibs/arm64-v8a/libradar.so
+          echo "Built artifact:"
+          ls -lh app/src/main/jniLibs/arm64-v8a/libradar.so
+          file app/src/main/jniLibs/arm64-v8a/libradar.so
 
-      - name: Upload JNI library artifact
+      - name: Upload libradar.so artifact
         uses: actions/upload-artifact@v4
         with:
           name: libradar-so
@@ -134,7 +136,9 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add app/src/main/jniLibs/arm64-v8a/libradar.so
-          git diff --cached --exit-code || git commit -m "build: libradar.so from GitHub Actions"
+          git diff --cached --exit-code \
+            || git commit -m "build: update libradar.so [skip ci]"
           git push || echo "Nothing to push"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
