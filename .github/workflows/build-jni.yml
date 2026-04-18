@@ -32,30 +32,55 @@ jobs:
         with:
           targets: aarch64-linux-android
 
-      - name: Cache cargo and cargo-ndk
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Set up Android SDK (includes NDK)
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Install NDK r26 via sdkmanager
+        run: |
+          sdkmanager "ndk;26.3.11579264" 2>/dev/null || sdkmanager "ndk;26.1.10909125" 2>/dev/null || true
+          NDK_PATH=$(ls -d ${ANDROID_SDK_ROOT}/ndk/26.* 2>/dev/null | sort -V | tail -1)
+          if [ -z "$NDK_PATH" ]; then
+            NDK_PATH=$(ls -d ${ANDROID_HOME}/ndk/26.* 2>/dev/null | sort -V | tail -1)
+          fi
+          if [ -z "$NDK_PATH" ]; then
+            echo "ERROR: No NDK r26 found after installation"
+            ls ${ANDROID_SDK_ROOT}/ndk/ 2>/dev/null || echo "No NDK directory"
+            exit 1
+          fi
+          echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+          echo "NDK found at: $NDK_PATH"
+
+      - name: Cache cargo registry and target
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/bin/cargo-ndk
             ~/.cargo/registry
             ~/.cargo/git
             mayara-jni/target
             mayara-server/target
-          key: ${{ runner.os }}-cargo-jni-${{ hashFiles('mayara-jni/Cargo.lock', 'mayara-server/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-jni-${{ hashFiles('mayara-jni/Cargo.toml', 'mayara-server/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-jni-
+
+      - name: Cache cargo-ndk binary
+        uses: actions/cache@v4
+        id: cache-cargo-ndk
+        with:
+          path: ~/.cargo/bin/cargo-ndk
+          key: ${{ runner.os }}-cargo-ndk-bin-v1
 
       - name: Install cargo-ndk
-        run: |
-          if ! command -v cargo-ndk &> /dev/null; then
-            echo "Installing cargo-ndk..."
-            cargo install cargo-ndk --locked
-          else
-            cargo-ndk --version
-          fi
-
-      - name: Set up Android NDK
-        uses: nttld/setup-ndk@v1
-        with:
-          ndk-version: r26b
+        if: steps.cache-cargo-ndk.outputs.cache-hit != 'true'
+        run: cargo install cargo-ndk --locked
 
       - name: Verify build environment
         run: |
@@ -63,24 +88,23 @@ jobs:
           rustc --version
           cargo --version
           rustup target list | grep aarch64-linux-android
-          
+
           echo ""
           echo "=== Build tools ==="
           cargo-ndk --version
-          
+
           echo ""
           echo "=== Android NDK ==="
           echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
-          test -d "$ANDROID_NDK_HOME" || (echo "ERROR: NDK not found" && exit 1)
-          
+          test -d "$ANDROID_NDK_HOME" || (echo "ERROR: NDK not found at $ANDROID_NDK_HOME" && exit 1)
+
           echo ""
           echo "=== Git submodule ==="
           git submodule status
           test -d "mayara-server/src" || (echo "ERROR: mayara-server not initialized" && exit 1)
 
       - name: Build JNI library (ARM64)
-        run: |
-          bash scripts/build_jni.sh
+        run: bash scripts/build_jni.sh
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
           RUST_BACKTRACE: full

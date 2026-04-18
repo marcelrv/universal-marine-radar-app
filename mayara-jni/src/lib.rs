@@ -88,7 +88,7 @@ fn init_logging() {
 }
 
 // ---------------------------------------------------------------------------
-// JNI: nativeStart(port: Int, emulator: Boolean): Boolean
+// JNI: nativeStart(port: Int, emulator: Boolean, pcapPath: String): Boolean
 // ---------------------------------------------------------------------------
 
 /// Start the mayara radar server on `127.0.0.1:{port}`.
@@ -99,12 +99,19 @@ fn init_logging() {
 /// Called from the JVM. The JNIEnv pointer is valid for this call only.
 #[no_mangle]
 pub extern "system" fn Java_com_marineyachtradar_mayara_jni_RadarJni_nativeStart<'local>(
-    _env: JNIEnv<'local>,
+    mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     port: jint,
     emulator: jboolean,
+    pcap_path_j: jni::objects::JString<'local>,
 ) -> jboolean {
     init_logging();
+
+    // Extract the pcap path string from Java
+    let pcap_path: String = match env.get_string(&pcap_path_j) {
+        Ok(s) => s.into(),
+        Err(_) => String::new(),
+    };
 
     let mut guard = match server_state().lock() {
         Ok(g) => g,
@@ -132,9 +139,10 @@ pub extern "system" fn Java_com_marineyachtradar_mayara_jni_RadarJni_nativeStart
 
     let port_u16 = port as u16;
     let use_emulator = emulator == JNI_TRUE;
+    let pcap = pcap_path.clone();
 
     rt.spawn(async move {
-        if let Err(e) = run_server(port_u16, use_emulator, shutdown_rx).await {
+        if let Err(e) = run_server(port_u16, use_emulator, pcap, shutdown_rx).await {
             error!("Server exited with error: {e:#}");
             append_log(format!("[ERROR] Server exited: {e:#}"));
         }
@@ -143,7 +151,9 @@ pub extern "system" fn Java_com_marineyachtradar_mayara_jni_RadarJni_nativeStart
     guard.shutdown_tx = Some(shutdown_tx);
     guard.rt = Some(rt);
 
-    let msg = format!("[INFO] mayara-server starting on port {port_u16} (emulator={use_emulator})");
+    let msg = format!(
+        "[INFO] mayara-server starting on port {port_u16} (emulator={use_emulator}, pcap='{pcap_path}')"
+    );
     info!("{}", msg);
     append_log(msg);
 
@@ -230,16 +240,23 @@ pub extern "system" fn Java_com_marineyachtradar_mayara_jni_RadarJni_nativeGetLo
 /// 2. `src/lib/server/mod.rs` — move `src/bin/mayara-server/web.rs` + sub-modules here
 /// 3. `pub async fn start_android(cli: Cli, shutdown_rx: oneshot::Receiver<()>)` in that module
 /// 4. Thin binary: import `mayara::server::Web` instead of local `web.rs`
-async fn run_server(port: u16, emulator: bool, shutdown_rx: oneshot::Receiver<()>) -> Result<()> {
+async fn run_server(port: u16, emulator: bool, pcap_path: String, shutdown_rx: oneshot::Receiver<()>) -> Result<()> {
     // Build Cli args programmatically (clap::Parser lets us parse from an iterator).
     let port_str = port.to_string();
     let mut args: Vec<&str> = vec!["mayara-server", "--port", &port_str];
     if emulator {
         args.push("--emulator");
     }
+    if !pcap_path.is_empty() {
+        args.push("--pcap");
+        args.push(&pcap_path);
+        args.push("--repeat");
+    }
     let cli = mayara::Cli::parse_from(args);
 
-    append_log(format!("[INFO] Starting full mayara server (port={port}, emulator={emulator})"));
+    append_log(format!(
+        "[INFO] Starting full mayara server (port={port}, emulator={emulator}, pcap='{pcap_path}')"
+    ));
 
     // Delegate to the library's Android entry point:
     //   – binds to 127.0.0.1:{port} only (loopback, no external exposure)

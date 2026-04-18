@@ -131,6 +131,22 @@ class RadarViewModel(application: Application) : AndroidViewModel(application) {
             is ConnectionMode.Network -> {
                 repository.connect(mode.baseUrl)
             }
+            is ConnectionMode.PcapDemo -> {
+                val started = try {
+                    RadarJni.startServer(port = mode.port, pcapPath = mode.pcapPath)
+                } catch (e: UnsatisfiedLinkError) {
+                    Log.w(TAG, "libradar.so not available on this device: ${e.message}")
+                    false
+                } catch (e: Throwable) {
+                    Log.e(TAG, "Failed to start embedded radar server (pcap demo)", e)
+                    false
+                }
+                if (!started) {
+                    Log.w(TAG, "PCAP demo server did not start; connecting anyway (may fail)")
+                }
+                val url = "http://127.0.0.1:${mode.port}"
+                repository.connect(url)
+            }
         }
     }
 

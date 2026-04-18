@@ -1,15 +1,21 @@
 package com.marineyachtradar.mayara.ui.connection
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Computer
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -28,6 +34,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -64,6 +71,29 @@ fun ConnectionPickerDialog(
     var selectedServerIndex by rememberSaveable { mutableIntStateOf(0) }
     var manualHost by rememberSaveable { mutableStateOf("") }
     var manualPort by rememberSaveable { mutableStateOf("6502") }
+    var pcapFilePath by rememberSaveable { mutableStateOf("") }
+    var pcapFileName by rememberSaveable { mutableStateOf("") }
+
+    val context = LocalContext.current
+    val pcapPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            // Copy the file into the app's cache directory so the JNI (Rust) layer gets a real path.
+            val resolver = context.contentResolver
+            val displayName = uri.lastPathSegment ?: "replay.pcap"
+            val dest = java.io.File(context.cacheDir, displayName)
+            try {
+                resolver.openInputStream(uri)?.use { input ->
+                    dest.outputStream().use { output -> input.copyTo(output) }
+                }
+                pcapFilePath = dest.absolutePath
+                pcapFileName = displayName
+            } catch (e: Exception) {
+                pcapFileName = "Error: ${e.message}"
+            }
+        }
+    }
 
     val manualHostValid = manualHost.isNotBlank() && manualHost.length <= 255
     val manualPortValid = manualPort.toIntOrNull()?.let { it in 1..65535 } == true
@@ -74,13 +104,19 @@ fun ConnectionPickerDialog(
             if (discoveredServers.isEmpty()) manualHostValid && manualPortValid
             else true
         }
+        PickerOption.PCAP_DEMO -> pcapFilePath.isNotEmpty()
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Connect to Radar", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .heightIn(max = 400.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
 
                 // ---- Embedded option ------------------------------------
                 ConnectionOptionCard(
@@ -174,6 +210,45 @@ fun ConnectionPickerDialog(
                     }
                 }
 
+                // ---- PCAP Demo option -----------------------------------
+                ConnectionOptionCard(
+                    selected = selectedOption == PickerOption.PCAP_DEMO,
+                    onSelect = { selectedOption = PickerOption.PCAP_DEMO },
+                    title = "PCAP Demo",
+                    subtitle = "Replay a recorded radar PCAP file for testing/demo",
+                    icon = { Icon(Icons.Filled.FolderOpen, contentDescription = null) },
+                )
+
+                // ---- PCAP sub-option (file picker) ---------------------
+                if (selectedOption == PickerOption.PCAP_DEMO) {
+                    Column(
+                        modifier = Modifier.padding(start = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Button(
+                            onClick = { pcapPickerLauncher.launch(arrayOf("*/*")) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(Icons.Filled.FolderOpen, contentDescription = null)
+                            Spacer(modifier = Modifier.padding(horizontal = 4.dp))
+                            Text("Choose PCAP File")
+                        }
+                        if (pcapFileName.isNotEmpty()) {
+                            Text(
+                                text = pcapFileName,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            Text(
+                                text = "No file selected",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(4.dp))
 
                 // ---- Remember my choice --------------------------------
@@ -216,6 +291,7 @@ fun ConnectionPickerDialog(
                             }
                             ConnectionMode.Network(baseUrl)
                         }
+                        PickerOption.PCAP_DEMO -> ConnectionMode.PcapDemo(pcapPath = pcapFilePath)
                     }
                     onConnect(mode, rememberChoice)
                 },
@@ -281,5 +357,5 @@ private fun ConnectionOptionCard(
 // Internal state enum — exposed for unit testing
 // ---------------------------------------------------------------------------
 
-/** The two top-level choices in the connection picker. */
-internal enum class PickerOption { EMBEDDED, NETWORK }
+/** The top-level choices in the connection picker. */
+internal enum class PickerOption { EMBEDDED, NETWORK, PCAP_DEMO }

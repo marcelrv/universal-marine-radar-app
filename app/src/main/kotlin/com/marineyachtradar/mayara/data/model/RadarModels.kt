@@ -11,6 +11,9 @@ sealed interface ConnectionMode {
 
     /** Connect to a remote mayara-server or SignalK node. */
     data class Network(val baseUrl: String) : ConnectionMode
+
+    /** Replay a PCAP file using the embedded server for demo/testing. */
+    data class PcapDemo(val pcapPath: String, val port: Int = 6502, val repeat: Boolean = true) : ConnectionMode
 }
 
 data class DiscoveredServer(

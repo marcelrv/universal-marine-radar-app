@@ -29,9 +29,10 @@ object RadarJni {
      *
      * @param port TCP port (default 6502)
      * @param emulator If true, uses the built-in radar emulator (no hardware needed)
+     * @param pcapPath Optional path to a .pcap/.pcap.gz file for demo replay (empty string = disabled)
      * @return true if the server started successfully; false if already running or on error
      */
-    private external fun nativeStart(port: Int, emulator: Boolean): Boolean
+    private external fun nativeStart(port: Int, emulator: Boolean, pcapPath: String): Boolean
 
     /**
      * Gracefully stop the server and release the Tokio runtime.
@@ -52,8 +53,8 @@ object RadarJni {
     /**
      * Start the server on the given port. Suspending; switches to [Dispatchers.IO].
      */
-    suspend fun startServer(port: Int = DEFAULT_PORT, emulator: Boolean = false): Boolean =
-        withContext(Dispatchers.IO) { nativeStart(port, emulator) }
+    suspend fun startServer(port: Int = DEFAULT_PORT, emulator: Boolean = false, pcapPath: String = ""): Boolean =
+        withContext(Dispatchers.IO) { nativeStart(port, emulator, pcapPath) }
 
     /**
      * Stop the server. Suspending; switches to [Dispatchers.IO].

@@ -20,8 +20,8 @@ class ConnectionPickerStateTest {
     // ------------------------------------------------------------------
 
     @Test
-    fun `PickerOption has exactly two values`() {
-        assertEquals(2, PickerOption.entries.size)
+    fun `PickerOption has exactly three values`() {
+        assertEquals(3, PickerOption.entries.size)
     }
 
     @Test
@@ -159,6 +159,21 @@ class ConnectionPickerStateTest {
     // ------------------------------------------------------------------
     // Helpers (mirroring the dialog's validation inline logic)
     // ------------------------------------------------------------------
+
+    @Test
+    fun `PcapDemo mode holds pcap path`() {
+        val mode = ConnectionMode.PcapDemo(pcapPath = "/data/user/0/com.example/cache/navico.pcap.gz")
+        assertEquals("/data/user/0/com.example/cache/navico.pcap.gz", mode.pcapPath)
+        assertEquals(6502, mode.port)
+        assertTrue(mode.repeat)
+    }
+
+    @Test
+    fun `PcapDemo is distinct from Embedded`() {
+        val pcap = ConnectionMode.PcapDemo("/tmp/test.pcap")
+        val embedded = ConnectionMode.Embedded()
+        assertFalse(pcap == embedded)
+    }
 
     private fun isValidPort(input: String): Boolean =
         input.toIntOrNull()?.let { it in 1..65535 } == true
