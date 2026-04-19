@@ -91,7 +91,32 @@ class RadarRepository(
         connectJob = scope.launch {
             try {
                 android.util.Log.i("RadarRepository", "Discovering radars at $baseUrl...")
-                val radars = apiClient.getRadars()
+
+                // Retry the initial HTTP call to handle server startup race conditions.
+                // The embedded Rust server may not have its TCP listener ready immediately.
+                // Only retry on connection-level errors (e.g. ConnectException), not HTTP errors.
+                var radars: List<RadarInfo> = emptyList()
+                var lastError: Exception? = null
+                for (attempt in 1..5) {
+                    try {
+                        radars = apiClient.getRadars()
+                        lastError = null
+                        break
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: java.net.ConnectException) {
+                        lastError = e
+                        android.util.Log.w("RadarRepository",
+                            "Connection attempt $attempt failed: ${e.message}")
+                        if (attempt < 5) delay(1_000)
+                    } catch (e: java.net.SocketException) {
+                        lastError = e
+                        android.util.Log.w("RadarRepository",
+                            "Connection attempt $attempt failed: ${e.message}")
+                        if (attempt < 5) delay(1_000)
+                    }
+                }
+                if (lastError != null) throw lastError!!
                 if (radars.isEmpty()) {
                     android.util.Log.i("RadarRepository", "No radars found yet at $baseUrl, retrying in 3s...")
                     retryJob = scope.launch {

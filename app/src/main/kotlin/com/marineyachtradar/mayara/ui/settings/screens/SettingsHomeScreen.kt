@@ -30,6 +30,7 @@ fun SettingsHomeScreen(
     onNavigateToConnection: () -> Unit,
     onNavigateToLogs: () -> Unit,
     onNavigateToUnits: () -> Unit,
+    onNavigateToRadarInfo: () -> Unit,
     onNavigateToAppInfo: () -> Unit,
     onFinish: () -> Unit,
 ) {
@@ -79,8 +80,16 @@ fun SettingsHomeScreen(
             }
             item {
                 SettingsNavRow(
+                    title = "Radar Info",
+                    subtitle = "Connected radar details, operating time",
+                    onClick = onNavigateToRadarInfo,
+                )
+                HorizontalDivider()
+            }
+            item {
+                SettingsNavRow(
                     title = "App Info",
-                    subtitle = "Version, license, radar firmware",
+                    subtitle = "Version, license, about",
                     onClick = onNavigateToAppInfo,
                 )
             }

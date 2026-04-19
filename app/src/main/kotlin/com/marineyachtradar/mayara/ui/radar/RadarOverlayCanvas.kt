@@ -32,17 +32,17 @@ fun RadarOverlayCanvas(
     ranges: List<Int>,
     currentRangeIndex: Int,
     distanceUnit: DistanceUnit,
+    panX: Float = 0f,
+    panY: Float = 0f,
     modifier: Modifier = Modifier,
 ) {
     val currentRange = ranges.getOrNull(currentRangeIndex) ?: 0
 
     Canvas(modifier = modifier) {
-        val cx = size.width / 2f
-        val cy = size.height / 2f
-        // Radar circle radius: match the GL shader's aspect-corrected circle.
-        // In portrait, GL scales down so the full circle fits the width;
-        // in landscape, it fits the height.
-        val radius = min(size.width, size.height) / 2f
+        val radarDiameter = min(size.width, size.height)
+        val cx = size.width / 2f + panX * radarDiameter
+        val cy = size.height / 2f - panY * radarDiameter
+        val radius = radarDiameter / 2f
 
         drawCompassRose(cx, cy, radius)
         if (currentRange > 0) {

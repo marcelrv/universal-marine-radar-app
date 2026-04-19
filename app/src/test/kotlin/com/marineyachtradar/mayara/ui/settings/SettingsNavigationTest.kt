@@ -45,8 +45,13 @@ class SettingsNavigationTest {
     }
 
     @Test
-    fun `SettingsScreen all contains exactly five destinations`() {
-        assertEquals(5, SettingsScreen.all.size)
+    fun `SettingsScreen RadarInfo route is radar_info`() {
+        assertEquals("radar_info", SettingsScreen.RadarInfo.route)
+    }
+
+    @Test
+    fun `SettingsScreen all contains exactly six destinations`() {
+        assertEquals(6, SettingsScreen.all.size)
     }
 
     @Test
@@ -56,6 +61,7 @@ class SettingsNavigationTest {
         assertTrue("connection_settings" in routes)
         assertTrue("server_logs" in routes)
         assertTrue("units" in routes)
+        assertTrue("radar_info" in routes)
         assertTrue("app_info" in routes)
     }
 }

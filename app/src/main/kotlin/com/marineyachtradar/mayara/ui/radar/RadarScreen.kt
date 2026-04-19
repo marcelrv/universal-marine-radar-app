@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -93,6 +94,7 @@ fun RadarScreen(
     val currentRangeIndex = (uiState as? RadarUiState.Connected)?.currentRangeIndex ?: 0
     val context = LocalContext.current
     val isPortrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
+    val panState = remember { RadarPanState() }
 
     if (isPortrait) {
         PortraitRadarLayout(
@@ -109,6 +111,7 @@ fun RadarScreen(
             ranges = ranges,
             currentRangeIndex = currentRangeIndex,
             distanceUnit = distanceUnit,
+            panState = panState,
             context = context,
         )
     } else {
@@ -126,6 +129,7 @@ fun RadarScreen(
             ranges = ranges,
             currentRangeIndex = currentRangeIndex,
             distanceUnit = distanceUnit,
+            panState = panState,
             context = context,
         )
     }
@@ -193,6 +197,7 @@ private fun LandscapeRadarLayout(
     ranges: List<Int>,
     currentRangeIndex: Int,
     distanceUnit: DistanceUnit,
+    panState: RadarPanState,
     context: android.content.Context,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -203,12 +208,15 @@ private fun LandscapeRadarLayout(
             legend = legend,
             powerState = (uiState as? RadarUiState.Connected)?.powerState,
             revolutionCount = revolutionCount,
+            panState = panState,
             modifier = Modifier.fillMaxSize(),
         )
         RadarOverlayCanvas(
             ranges = ranges,
             currentRangeIndex = currentRangeIndex,
             distanceUnit = distanceUnit,
+            panX = panState.x,
+            panY = panState.y,
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -318,6 +326,7 @@ private fun PortraitRadarLayout(
     ranges: List<Int>,
     currentRangeIndex: Int,
     distanceUnit: DistanceUnit,
+    panState: RadarPanState,
     context: android.content.Context,
 ) {
     Column(
@@ -374,12 +383,15 @@ private fun PortraitRadarLayout(
                 legend = legend,
                 powerState = (uiState as? RadarUiState.Connected)?.powerState,
                 revolutionCount = revolutionCount,
+                panState = panState,
                 modifier = Modifier.fillMaxSize(),
             )
             RadarOverlayCanvas(
                 ranges = ranges,
                 currentRangeIndex = currentRangeIndex,
                 distanceUnit = distanceUnit,
+                panX = panState.x,
+                panY = panState.y,
                 modifier = Modifier.fillMaxSize(),
             )
 

@@ -90,8 +90,16 @@ void main() {
         return;
     }
 
-    // Range ring width: ~1.5 px scaled to normalized coordinates.
-    float ringWidth = 1.5 / max(u_Resolution.x, u_Resolution.y);
+    // Range ring width: ~4 px scaled to normalized coordinates for visibility.
+    float ringWidth = 4.0 / max(u_Resolution.x, u_Resolution.y);
+    // Crosshair (N-S / E-W) line width: slightly thinner than rings.
+    float crossWidth = 2.5 / max(u_Resolution.x, u_Resolution.y);
+
+    // Draw N-S and E-W crosshair lines for quadrant separation.
+    if ((abs(radarPos.x) < crossWidth || abs(radarPos.y) < crossWidth)) {
+        gl_FragColor = u_RingColor;
+        return;
+    }
 
     // Draw range rings before the texture sample so rings appear on top.
     if (abs(dist - R1) < ringWidth ||
@@ -159,10 +167,10 @@ void main() {
     // -----------------------------------------------------------------------
 
     @Volatile
-    private var centerX = 0f
+    internal var centerX = 0f
 
     @Volatile
-    private var centerY = 0f
+    internal var centerY = 0f
 
     // -----------------------------------------------------------------------
     // Palette state

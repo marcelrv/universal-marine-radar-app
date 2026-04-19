@@ -6,10 +6,10 @@ import androidx.compose.runtime.getValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.marineyachtradar.mayara.domain.RadarInfoSnapshot
 import com.marineyachtradar.mayara.ui.settings.screens.AppInfoScreen
 import com.marineyachtradar.mayara.ui.settings.screens.ConnectionSettingsScreen
 import com.marineyachtradar.mayara.ui.settings.screens.EmbeddedServerLogsScreen
+import com.marineyachtradar.mayara.ui.settings.screens.RadarInfoScreen
 import com.marineyachtradar.mayara.ui.settings.screens.SettingsHomeScreen
 import com.marineyachtradar.mayara.ui.settings.screens.UnitsScreen
 
@@ -24,12 +24,12 @@ sealed class SettingsScreen(val route: String) {
     data object ConnectionSettings : SettingsScreen("connection_settings")
     data object EmbeddedServerLogs : SettingsScreen("server_logs")
     data object Units : SettingsScreen("units")
+    data object RadarInfo : SettingsScreen("radar_info")
     data object AppInfo : SettingsScreen("app_info")
 
     companion object {
-        /** All destinations in declaration order. Useful for navigation tests. */
         val all: List<SettingsScreen> by lazy {
-            listOf(Home, ConnectionSettings, EmbeddedServerLogs, Units, AppInfo)
+            listOf(Home, ConnectionSettings, EmbeddedServerLogs, Units, RadarInfo, AppInfo)
         }
     }
 }
@@ -67,6 +67,9 @@ fun SettingsNavHost(
                 },
                 onNavigateToUnits = {
                     navController.navigate(SettingsScreen.Units.route)
+                },
+                onNavigateToRadarInfo = {
+                    navController.navigate(SettingsScreen.RadarInfo.route)
                 },
                 onNavigateToAppInfo = {
                     navController.navigate(SettingsScreen.AppInfo.route)
@@ -107,10 +110,16 @@ fun SettingsNavHost(
             )
         }
 
+        composable(SettingsScreen.RadarInfo.route) {
+            RadarInfoScreen(
+                radarInfo = radarInfo,
+                onBack = { navController.popBackStack() },
+            )
+        }
+
         composable(SettingsScreen.AppInfo.route) {
             AppInfoScreen(
                 appVersion = viewModel.appVersion,
-                radarInfo = radarInfo,
                 onBack = { navController.popBackStack() },
             )
         }

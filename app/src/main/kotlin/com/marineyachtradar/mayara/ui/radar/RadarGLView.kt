@@ -7,7 +7,10 @@ import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.marineyachtradar.mayara.data.model.ColorPalette
@@ -16,21 +19,16 @@ import com.marineyachtradar.mayara.data.model.RadarLegend
 import com.marineyachtradar.mayara.data.model.SpokeData
 
 /**
- * Compose wrapper for the OpenGL ES radar canvas.
- *
- * Renders the radar sweep using [RadarGLRenderer] inside a [GLSurfaceView].
- *
- * ## Gesture handling
- * - **One-finger drag** → pans the radar centre (look-ahead mode)
- * - **Double-tap**      → resets pan to centre
- * - **Pinch gesture**   → **discarded** — see spec §3.2 and [DisabledPinchZoom]
- *
- * @param latestSpoke      Most recent [SpokeData] decoded from the spoke WebSocket.
- *                         When non-null, the renderer updates the corresponding texture column.
- * @param spokesPerRevolution  Number of spokes per 360° from the capabilities handshake.
- * @param palette          Active colour palette applied by the fragment shader LUT.
- * @param modifier         Standard Compose [Modifier].
+ * Holds the current pan offset so that both the GL renderer and the Compose overlay
+ * can track the radar centre position.
  */
+class RadarPanState {
+    var x by mutableFloatStateOf(0f)
+        internal set
+    var y by mutableFloatStateOf(0f)
+        internal set
+}
+
 @Composable
 fun RadarGLView(
     latestSpoke: SpokeData?,
@@ -39,25 +37,21 @@ fun RadarGLView(
     legend: RadarLegend? = null,
     powerState: PowerState? = null,
     revolutionCount: Long = 0L,
+    panState: RadarPanState? = null,
     modifier: Modifier = Modifier,
 ) {
     val renderer = remember { RadarGLRenderer() }
 
-    // Clear the radar texture when power transitions away from TRANSMIT
     LaunchedEffect(powerState) {
         if (powerState != null && powerState != PowerState.TRANSMIT) {
             renderer.clearAll()
         }
     }
 
-    // Clear stale spoke data at the start of each new revolution
-    LaunchedEffect(revolutionCount) {
-        if (revolutionCount > 0) {
-            renderer.clearAll()
-        }
-    }
+    // Revolution count is tracked but no longer triggers clearAll().
+    // Each spoke naturally overwrites the previous data at the same angle,
+    // producing the classic radar sweep appearance.
 
-    // Apply legend palette when it becomes available from the server
     LaunchedEffect(legend) {
         renderer.setLegendPalette(legend)
     }
@@ -65,25 +59,20 @@ fun RadarGLView(
     AndroidView(
         modifier = modifier,
         factory = { context ->
-            createGLSurfaceView(context, renderer)
+            createGLSurfaceView(context, renderer, panState)
         },
         update = { _ ->
-            // Feed new spoke data into the renderer whenever Compose recomposes.
             latestSpoke?.let { renderer.updateSpoke(it, spokesPerRevolution) }
             renderer.setPalette(palette)
         }
     )
 }
 
-// ---------------------------------------------------------------------------
-// GLSurfaceView factory (extracted for testability)
-// ---------------------------------------------------------------------------
-
-/**
- * Creates and configures a [GLSurfaceView] with GLES 2.0, attaches [renderer],
- * and wires gesture detectors to the view's touch handler.
- */
-internal fun createGLSurfaceView(context: Context, renderer: RadarGLRenderer): GLSurfaceView {
+internal fun createGLSurfaceView(
+    context: Context,
+    renderer: RadarGLRenderer,
+    panState: RadarPanState? = null,
+): GLSurfaceView {
     val glView = GLSurfaceView(context)
     glView.setEGLContextClientVersion(2)
     glView.setRenderer(renderer)
@@ -96,15 +85,22 @@ internal fun createGLSurfaceView(context: Context, renderer: RadarGLRenderer): G
             distanceX: Float,
             distanceY: Float,
         ): Boolean {
-            // Convert pixel delta to normalised display units [-0.5..0.5].
             val normX = distanceX / glView.width * -1f
             val normY = distanceY / glView.height
             renderer.setCenterOffset(normX, normY)
+            panState?.let {
+                it.x = renderer.centerX
+                it.y = renderer.centerY
+            }
             return true
         }
 
         override fun onDoubleTap(e: MotionEvent): Boolean {
             renderer.resetCenter()
+            panState?.let {
+                it.x = 0f
+                it.y = 0f
+            }
             return true
         }
     })
