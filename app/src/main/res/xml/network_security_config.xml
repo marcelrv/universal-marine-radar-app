@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Network Security Config for Mayara.
+  Network Security Config for Universal Marine Radar Display.
 
   Cleartext HTTP/WS is required for:
-    - 127.0.0.1  — embedded mayara-server on physical device (JNI server binds here)
+    - 127.0.0.1  — embedded server on physical device (JNI server binds here)
     - 10.0.2.2   — Android emulator host loopback alias
     - LAN radar hardware — marine radar devices do not support TLS
 

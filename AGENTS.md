@@ -1,4 +1,4 @@
-# Mayara Android App — AI Agent Context
+# Universal Marine Radar Display for Android — AI Agent Context
 
 This repository contains a native Android radar display application backed by an embedded Rust
 server compiled as `libradar.so`. Read `development_docs/agent_instructions.md` before editing

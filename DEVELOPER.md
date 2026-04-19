@@ -1,4 +1,4 @@
-# Mayara Android App — Developer Guide
+# Universal Marine Radar Display for Android — Developer Guide
 
 ## Building
 

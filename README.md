@@ -1,9 +1,7 @@
-# Mayara — Marine Radar Display for Android
+# Universal Marine Radar Display for Android
 
-Mayara is a native Android application that displays marine radar data from
-supported radar hardware. It connects to a **mayara-server** backend (running
-either as an embedded library or on a remote host) and renders live spoke data
-through OpenGL ES.
+Universal Marine Radar Display for Android is a native Android application that displays marine radar data from supported radar hardware. It connects to a **mayara-server** backend (running
+either as an embedded library or on a remote host) and renders live radar spoke data through OpenGL ES.
 
 ## Supported Radar Brands
 
