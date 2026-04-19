@@ -1,18 +1,16 @@
 package com.marineyachtradar.mayara.ui.radar.overlay
 
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.marineyachtradar.mayara.data.model.PowerState
 
 /**
@@ -54,24 +52,22 @@ fun PowerToggle(
     }
 
     val isEnabled = powerState != PowerState.WARMUP
+    val next = nextPowerTarget(powerState)
 
-    Button(
-        onClick = {
-            val next = nextPowerTarget(powerState) ?: return@Button
-            onPowerAction(next)
-        },
-        enabled = isEnabled,
+    Surface(
         shape = RoundedCornerShape(50),
-        colors = ButtonDefaults.buttonColors(containerColor = containerColor),
-        modifier = modifier.padding(4.dp).height(32.dp),
+        color = containerColor.copy(alpha = if (isEnabled) 1f else 0.7f),
+        modifier = modifier
+            .padding(end = 8.dp)
+            .clickable(enabled = isEnabled) {
+                next?.let { onPowerAction(it) }
+            },
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelLarge.copy(
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
-            ),
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            color = Color.White,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
         )
     }
 }

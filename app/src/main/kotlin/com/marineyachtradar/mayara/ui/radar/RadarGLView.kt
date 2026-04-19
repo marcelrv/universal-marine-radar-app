@@ -56,7 +56,9 @@ fun RadarGLView(
     }
 
     // Reset pan and zoom when range changes so the full new range is visible.
+    // Clear old spoke data — it was captured at the previous range and is now invalid.
     LaunchedEffect(currentRangeIndex) {
+        renderer.clearAll()
         renderer.resetCenter()
         renderer.resetZoom()
         panState?.reset()

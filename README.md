@@ -7,18 +7,26 @@ either as an embedded library or on a remote host) and renders live radar spoke 
 
 | Radar Display | Display Settings |
 |-------------|-----------------|
-| ![Radar display ](docs/screenshots/radar-targets.jpg) | ![Display settings with controls](docs/screenshots/radar-display-settings.jpg) |
+| ![Radar display](docs/screenshots/radar-targets.png) | ![Display settings with controls](docs/screenshots/radar-display-settings.png) |
 
 The app displays real-time radar data from supported radar hardware with full range control, gain/sea/rain settings, and multi-radar support.
 
 ## Supported Radar Brands
 
-| Brand | Models |
-|-------|--------|
-| **Navico** | Broadband (BR24, 3G, 4G), Halo (20+, 24) |
-| **Garmin** | xHD, xHD2, Fantom |
-| **Raymarine** | Quantum (Wi-Fi) |
-| **Furuno** | DRS series |
+Fully supported and tested with real hardware:
+
+- **Navico** — BR24, 3G, 4G, HALO 20, HALO 20+, HALO 24, HALO 2000–6000
+- **Raymarine** — Quantum, RD series
+- **Furuno** — DRS-NXT series (DRS4D-NXT, DRS6A-NXT, DRS12A-NXT, DRS25A-NXT) including dual range
+- **Furuno** — DRS4W WiFi ("1st Watch")
+- **Furuno** — FAR-2xx7 series
+
+Implemented but awaiting real-hardware validation:
+
+- **Garmin** — HD, xHD, xHD2, xHD3, Fantom, Fantom Pro (all models including dual range and MotionScope/Doppler)
+- **Furuno** — DRS, DRS4DL, DRS6A X-Class, FAR-15x3, FAR-3000
+- **Raymarine** — HD, Magnum, Cyclone
+
 
 ## Features
 

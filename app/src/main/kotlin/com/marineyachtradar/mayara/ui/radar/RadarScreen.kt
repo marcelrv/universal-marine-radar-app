@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.marineyachtradar.mayara.data.model.ColorPalette
 import com.marineyachtradar.mayara.data.model.DistanceUnit
+import com.marineyachtradar.mayara.data.model.RadarOrientation
 import com.marineyachtradar.mayara.data.model.RadarUiState
 import com.marineyachtradar.mayara.ui.connection.ConnectionPickerDialog
 import com.marineyachtradar.mayara.ui.radar.bottomsheet.RadarControlSheet
@@ -91,6 +92,7 @@ fun RadarScreen(
     val legend = (uiState as? RadarUiState.Connected)?.capabilities?.legend
     val ranges = (uiState as? RadarUiState.Connected)?.capabilities?.ranges ?: emptyList()
     val currentRangeIndex = (uiState as? RadarUiState.Connected)?.currentRangeIndex ?: 0
+    val orientation = (uiState as? RadarUiState.Connected)?.controls?.orientation ?: RadarOrientation.HEAD_UP
     val context = LocalContext.current
     val isPortrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
     val panState = remember { RadarPanState() }
@@ -110,6 +112,7 @@ fun RadarScreen(
             ranges = ranges,
             currentRangeIndex = currentRangeIndex,
             distanceUnit = distanceUnit,
+            orientation = orientation,
             panState = panState,
             context = context,
         )
@@ -128,6 +131,7 @@ fun RadarScreen(
             ranges = ranges,
             currentRangeIndex = currentRangeIndex,
             distanceUnit = distanceUnit,
+            orientation = orientation,
             panState = panState,
             context = context,
         )
@@ -196,6 +200,7 @@ private fun LandscapeRadarLayout(
     ranges: List<Int>,
     currentRangeIndex: Int,
     distanceUnit: DistanceUnit,
+    orientation: RadarOrientation,
     panState: RadarPanState,
     context: android.content.Context,
 ) {
@@ -221,53 +226,87 @@ private fun LandscapeRadarLayout(
             modifier = Modifier.fillMaxSize(),
         )
 
-        // Top-left: settings gear + HUD
-        Column(
+        // Top bar: gear (left) + name pill (center) + power toggle (right) — all vertically centred
+        Row(
             modifier = Modifier
-                .align(Alignment.TopStart)
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
                 .windowInsetsPadding(WindowInsets.statusBars),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(
                 onClick = {
                     context.startActivity(Intent(context, SettingsActivity::class.java))
                 },
-                modifier = Modifier.size(56.dp),
+                modifier = Modifier.size(48.dp),
             ) {
                 Icon(
                     imageVector = Icons.Filled.Settings,
                     contentDescription = "Settings",
                     tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(32.dp),
+                    modifier = Modifier.size(28.dp),
                 )
             }
-            HudOverlay(navigationData = navigationData, connectionLabel = connectionLabel)
+            if (radarName.isNotBlank()) {
+                RadarNamePill(
+                    radarName = radarName,
+                    onTapped = { viewModel.onRadarNameTapped() },
+                )
+            }
+            if (uiState is RadarUiState.Connected) {
+                val connected = uiState as RadarUiState.Connected
+                PowerToggle(
+                    powerState = connected.powerState,
+                    onPowerAction = { viewModel.onPowerAction(it) },
+                )
+            } else {
+                Spacer(Modifier.size(48.dp))
+            }
         }
 
-        // Top-center: radar name pill
-        if (radarName.isNotBlank()) {
-            RadarNamePill(
-                radarName = radarName,
-                onTapped = { viewModel.onRadarNameTapped() },
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .padding(top = 8.dp),
+        // Top-left (below top bar): HUD overlay
+        HudOverlay(
+            navigationData = navigationData,
+            connectionLabel = connectionLabel,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(top = 56.dp),
+        )
+
+        // Bottom-left: Tune FAB + orientation label (mirrors RangeControls at bottom-right)
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (uiState is RadarUiState.Connected) {
+                FloatingActionButton(
+                    onClick = { viewModel.onShowControlSheet() },
+                    shape = RoundedCornerShape(16.dp),
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Icon(Icons.Filled.Tune, contentDescription = "Radar Settings")
+                }
+            }
+            Text(
+                text = orientationAbbreviation(orientation),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
 
         when (uiState) {
             is RadarUiState.Connected -> {
-                val connected = uiState as RadarUiState.Connected
-                PowerToggle(
-                    powerState = connected.powerState,
-                    onPowerAction = { viewModel.onPowerAction(it) },
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .windowInsetsPadding(WindowInsets.statusBars),
-                )
                 RangeControls(
-                    ranges = connected.capabilities.ranges,
-                    currentIndex = connected.currentRangeIndex,
+                    ranges = uiState.capabilities.ranges,
+                    currentIndex = uiState.currentRangeIndex,
                     onRangeUp = { viewModel.onRangeUp() },
                     onRangeDown = { viewModel.onRangeDown() },
                     distanceUnit = distanceUnit,
@@ -275,18 +314,6 @@ private fun LandscapeRadarLayout(
                         .align(Alignment.BottomEnd)
                         .windowInsetsPadding(WindowInsets.navigationBars),
                 )
-                FloatingActionButton(
-                    onClick = { viewModel.onShowControlSheet() },
-                    shape = RoundedCornerShape(16.dp),
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .windowInsetsPadding(WindowInsets.navigationBars)
-                        .padding(bottom = 16.dp),
-                ) {
-                    Icon(Icons.Filled.Tune, contentDescription = "Radar Settings")
-                }
             }
             is RadarUiState.Loading -> {
                 Column(
@@ -327,6 +354,7 @@ private fun PortraitRadarLayout(
     ranges: List<Int>,
     currentRangeIndex: Int,
     distanceUnit: DistanceUnit,
+    orientation: RadarOrientation,
     panState: RadarPanState,
     context: android.content.Context,
 ) {
@@ -352,7 +380,7 @@ private fun PortraitRadarLayout(
             modifier = Modifier.fillMaxSize(),
         )
 
-        // Top bar: settings gear + radar name + power toggle
+        // Top bar: gear (left) + name pill (center) + power toggle (right) — all vertically centred
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -365,13 +393,13 @@ private fun PortraitRadarLayout(
                 onClick = {
                     context.startActivity(Intent(context, SettingsActivity::class.java))
                 },
-                modifier = Modifier.size(56.dp),
+                modifier = Modifier.size(48.dp),
             ) {
                 Icon(
                     imageVector = Icons.Filled.Settings,
                     contentDescription = "Settings",
                     tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(32.dp),
+                    modifier = Modifier.size(28.dp),
                 )
             }
             if (radarName.isNotBlank()) {
@@ -386,39 +414,58 @@ private fun PortraitRadarLayout(
                     onPowerAction = { viewModel.onPowerAction(it) },
                 )
             } else {
+                // Placeholder to keep name pill centred
                 Spacer(Modifier.size(48.dp))
             }
         }
 
+        // Bottom-left: Tune FAB + orientation label (mirrors RangeControls at bottom-right)
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (uiState is RadarUiState.Connected) {
+                FloatingActionButton(
+                    onClick = { viewModel.onShowControlSheet() },
+                    shape = RoundedCornerShape(16.dp),
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Icon(Icons.Filled.Tune, contentDescription = "Radar Settings")
+                }
+            }
+            Text(
+                text = orientationAbbreviation(orientation),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+
         when (uiState) {
             is RadarUiState.Connected -> {
-                // Bottom controls: HUD + Tune FAB + Range controls
-                Row(
+                RangeControls(
+                    ranges = uiState.capabilities.ranges,
+                    currentIndex = uiState.currentRangeIndex,
+                    onRangeUp = { viewModel.onRangeUp() },
+                    onRangeDown = { viewModel.onRangeDown() },
+                    distanceUnit = distanceUnit,
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .align(Alignment.BottomEnd)
+                        .windowInsetsPadding(WindowInsets.navigationBars),
+                )
+                HudOverlay(
+                    navigationData = navigationData,
+                    connectionLabel = connectionLabel,
+                    modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .windowInsetsPadding(WindowInsets.navigationBars)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    HudOverlay(navigationData = navigationData, connectionLabel = connectionLabel)
-                    FloatingActionButton(
-                        onClick = { viewModel.onShowControlSheet() },
-                        shape = RoundedCornerShape(16.dp),
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                        contentColor = MaterialTheme.colorScheme.primary,
-                    ) {
-                        Icon(Icons.Filled.Tune, contentDescription = "Radar Settings")
-                    }
-                    RangeControls(
-                        ranges = uiState.capabilities.ranges,
-                        currentIndex = uiState.currentRangeIndex,
-                        onRangeUp = { viewModel.onRangeUp() },
-                        onRangeDown = { viewModel.onRangeDown() },
-                        distanceUnit = distanceUnit,
-                    )
-                }
+                        .padding(bottom = 8.dp),
+                )
             }
             is RadarUiState.Loading -> {
                 Column(
@@ -440,4 +487,11 @@ private fun PortraitRadarLayout(
             }
         }
     }
+}
+
+/** Abbreviated orientation label matching mayara web UI conventions. */
+private fun orientationAbbreviation(orientation: RadarOrientation): String = when (orientation) {
+    RadarOrientation.HEAD_UP -> "H Up"
+    RadarOrientation.NORTH_UP -> "N Up"
+    RadarOrientation.COURSE_UP -> "C Up"
 }
