@@ -2,12 +2,13 @@
 <!--
   Network Security Config for Mayara.
 
-  Cleartext HTTP is permitted ONLY for the two loopback addresses used by the
-  embedded mayara-server:
-    - 127.0.0.1  — physical device (JNI server binds here)
+  Cleartext HTTP/WS is required for:
+    - 127.0.0.1  — embedded mayara-server on physical device (JNI server binds here)
     - 10.0.2.2   — Android emulator host loopback alias
+    - LAN radar hardware — marine radar devices do not support TLS
 
-  All other traffic (remote network mode) must use HTTPS.
+  The base-config permits cleartext globally because network-mode connects to
+  radar hardware on the local network which does not support HTTPS/WSS.
 -->
 <network-security-config>
     <domain-config cleartextTrafficPermitted="true">

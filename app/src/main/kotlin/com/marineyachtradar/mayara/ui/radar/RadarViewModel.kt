@@ -266,8 +266,17 @@ class RadarViewModel(application: Application) : AndroidViewModel(application) {
                 repository.setConnectionLabel("Network (${mode.baseUrl.removePrefix("http://").removePrefix("https://")})")
             }
             is ConnectionMode.PcapDemo -> {
+                val sanitizedPath = mode.pcapPath
+                if (sanitizedPath.contains("..")) {
+                    Log.e(TAG, "Rejected pcap path with path traversal: ${mode.pcapPath}")
+                    return
+                }
+                if (!java.io.File(sanitizedPath).exists()) {
+                    Log.e(TAG, "Rejected pcap path — file does not exist: ${mode.pcapPath}")
+                    return
+                }
                 val started = try {
-                    RadarJni.startServer(port = mode.port, pcapPath = mode.pcapPath)
+                    RadarJni.startServer(port = mode.port, pcapPath = sanitizedPath)
                 } catch (e: UnsatisfiedLinkError) {
                     Log.w(TAG, "libradar.so not available on this device: ${e.message}")
                     false

@@ -36,6 +36,9 @@ use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
 
 // Raw Android NDK log function — linked from the NDK's liblog.so at runtime.
+// Conditionally compiled so that `cargo test` works on host (Linux CI) without
+// the Android NDK present.
+#[cfg(target_os = "android")]
 #[link(name = "log")]
 extern "C" {
     fn __android_log_write(
@@ -43,6 +46,17 @@ extern "C" {
         tag: *const std::ffi::c_char,
         text: *const std::ffi::c_char,
     ) -> std::ffi::c_int;
+}
+
+/// No-op stub used when running host tests (Linux / macOS CI — no Android NDK).
+#[cfg(not(target_os = "android"))]
+#[allow(non_snake_case, dead_code)]
+unsafe fn __android_log_write(
+    _prio: std::ffi::c_int,
+    _tag: *const std::ffi::c_char,
+    _text: *const std::ffi::c_char,
+) -> std::ffi::c_int {
+    0
 }
 
 // ---------------------------------------------------------------------------

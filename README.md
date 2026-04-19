@@ -30,62 +30,26 @@ through OpenGL ES.
 - **Multi-radar** — When the server exposes more than one radar, tap the
   radar name pill to switch.
 
-## Building
+## Building & Architecture
 
-### Prerequisites
+See [DEVELOPER.md](DEVELOPER.md) for build instructions, architecture diagrams,
+API endpoints, and CI workflow documentation.
 
-- Android Studio Hedgehog (2023.1) or later
-- JDK 17
-- Android SDK 34 (compile), API 26+ (min)
-- Rust toolchain (for building the embedded server `.so`)
+## Attribution
 
-### Build the .so (embedded mode)
+This application is built on top of the excellent
+[**mayara-server**](https://github.com/MarineYachtRadar/mayara-server) project — a comprehensive open-source
+marine radar server that handles the low-level spoke decoding, radar
+communication protocols (Navico, Garmin, Raymarine, Furuno), and SignalK API
+layer. Without mayara-server, this Android app would not exist.
 
-```bash
-rustup target add aarch64-linux-android
-cargo install cargo-ndk
-# Set ANDROID_NDK_HOME to NDK r26b
-bash scripts/build_jni.sh
-```
-
-### Build the APK
-
-```bash
-./gradlew assembleDebug
-```
-
-The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
-
-### Run tests
-
-```bash
-./gradlew test                    # JVM unit tests
-./gradlew connectedAndroidTest    # Compose + integration tests (emulator/device)
-```
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────────────┐
-│                 Jetpack Compose UI                    │
-│  RadarScreen ─ HudOverlay ─ RangeControls ─ Sheet    │
-├──────────────────────────────────────────────────────┤
-│                RadarViewModel                        │
-├──────────────────────────────────────────────────────┤
-│  RadarRepository (single source of truth)            │
-│  ├─ ApiClient (REST)                                 │
-│  ├─ SpokeClient (WS binary protobuf)                │
-│  └─ SignalKStreamClient (WS JSON delta)              │
-├──────────────────────────────────────────────────────┤
-│  RadarGLRenderer (OpenGL ES 2.0)                     │
-├──────────────────────────────────────────────────────┤
-│  mayara-jni → libradar.so (Rust, axum on 127.0.0.1) │
-└──────────────────────────────────────────────────────┘
-```
+Huge thanks all contributors to the mayara project for making
+high-quality radar software freely available to the marine community.
 
 ## License
 
 This application is licensed under the **GNU General Public License v2.0**
 (GPL-2.0). See [LICENSE](LICENSE) for details.
 
-The embedded **mayara-server** library is also GPL-2.0 licensed.
+The embedded **mayara-server** library is also GPL-2.0 licensed —
+see the [mayara project](https://github.com/MarineYachtRadar/mayara-servera) for details.

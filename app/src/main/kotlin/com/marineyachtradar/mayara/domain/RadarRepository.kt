@@ -25,6 +25,17 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.math.min
+
+/** Maximum number of consecutive WebSocket reconnection attempts before giving up. */
+private const val MAX_RETRIES = 10
+
+/** Maximum backoff delay between reconnection attempts (30 seconds). */
+private const val MAX_BACKOFF_MS = 30_000L
+
+/** Compute exponential backoff delay: 1s, 2s, 4s, 8s, … capped at [MAX_BACKOFF_MS]. */
+private fun retryDelayMs(attempt: Int): Long =
+    min(1_000L shl (attempt - 1).coerceAtLeast(0), MAX_BACKOFF_MS)
 
 /**
  * Single source of truth for all radar state observed by the Compose UI.
@@ -407,21 +418,29 @@ class RadarRepository(
                                 lastRangeUpdateAngle = spoke.angle
                             }
                         }
-                    // Flow completed normally (server closed connection)
-                    android.util.Log.i("RadarRepository", "Spoke stream completed normally")
-                    break
+                    // Flow completed normally (server closed connection — e.g. radar power cycle).
+                    // Treat as a retriable disconnect rather than a permanent stop.
+                    consecutiveFailures++
+                    android.util.Log.i("RadarRepository",
+                        "Spoke stream completed normally, will reconnect (attempt $consecutiveFailures)")
+                    if (consecutiveFailures >= MAX_RETRIES) {
+                        android.util.Log.e("RadarRepository",
+                            "Spoke stream gave up after $consecutiveFailures retries")
+                        break
+                    }
+                    delay(retryDelayMs(consecutiveFailures))
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     consecutiveFailures++
                     android.util.Log.w("RadarRepository",
                         "Spoke stream failed (attempt $consecutiveFailures): ${e.message}")
-                    if (consecutiveFailures >= 10) {
+                    if (consecutiveFailures >= MAX_RETRIES) {
                         android.util.Log.e("RadarRepository",
                             "Spoke stream gave up after $consecutiveFailures retries")
                         break
                     }
-                    delay(1_000L)
+                    delay(retryDelayMs(consecutiveFailures))
                 }
             }
         }
@@ -433,16 +452,24 @@ class RadarRepository(
             while (isActive) {
                 try {
                     streamClient.connect(streamUrl)
-                        .collect { update -> applyControlUpdate(radarId, update) }
-                    break
+                        .collect { update ->
+                            consecutiveFailures = 0
+                            applyControlUpdate(radarId, update)
+                        }
+                    // Flow completed normally (server closed connection — e.g. radar power cycle).
+                    consecutiveFailures++
+                    android.util.Log.i("RadarRepository",
+                        "Control stream completed normally, will reconnect (attempt $consecutiveFailures)")
+                    if (consecutiveFailures >= MAX_RETRIES) break
+                    delay(retryDelayMs(consecutiveFailures))
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     consecutiveFailures++
                     android.util.Log.w("RadarRepository",
                         "Control stream failed (attempt $consecutiveFailures): ${e.message}")
-                    if (consecutiveFailures >= 10) break
-                    delay(1_000L)
+                    if (consecutiveFailures >= MAX_RETRIES) break
+                    delay(retryDelayMs(consecutiveFailures))
                 }
             }
         }
