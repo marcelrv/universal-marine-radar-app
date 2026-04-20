@@ -125,7 +125,7 @@ private fun DrawScope.drawRangeLabels(
     currentRange: Int,
     distanceUnit: DistanceUnit,
 ) {
-    val ringFractions = floatArrayOf(0.25f, 0.50f, 0.75f)
+    val ringFractions = floatArrayOf(0.25f, 0.50f, 0.75f, 1.00f)
     val labelAngle = Math.toRadians(45.0).toFloat()
 
     val paint = android.graphics.Paint().apply {

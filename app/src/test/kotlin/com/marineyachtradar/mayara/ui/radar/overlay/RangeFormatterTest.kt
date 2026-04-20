@@ -21,6 +21,12 @@ class RangeFormatterTest {
 
     @ParameterizedTest(name = "{0} m → \"{1}\"")
     @CsvSource(
+        "58, 1/32 NM",    // 1852/32 ≈ 57.875, rounded
+        "57, 1/32 NM",    // RangeStepper.NAUTICAL_METRES value
+        "116, 1/16 NM",   // 1852/16 ≈ 115.75, rounded
+        "115, 1/16 NM",   // RangeStepper.NAUTICAL_METRES value
+        "173, 3/32 NM",   // 1852*3/32 ≈ 173.625
+        "347, 3/16 NM",   // 1852*3/16 ≈ 347.25
         "231, 1/8 NM",    // 1852/8 ≈ 231.5
         "232, 1/8 NM",    // exact
         "240, 1/8 NM",    // within 5% of 231.5

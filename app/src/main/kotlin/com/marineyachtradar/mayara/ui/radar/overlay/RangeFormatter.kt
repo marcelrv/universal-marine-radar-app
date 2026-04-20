@@ -2,6 +2,7 @@ package com.marineyachtradar.mayara.ui.radar.overlay
 
 import com.marineyachtradar.mayara.data.model.DistanceUnit
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * Formats radar range values (in metres) for display, respecting the user's distance unit
@@ -12,14 +13,8 @@ import kotlin.math.abs
  */
 object RangeFormatter {
 
-    /** Common marine radar range fractions (label → metres). */
-    private val NM_FRACTIONS = listOf(
-        "1/8" to 231.5,   // 1852 / 8
-        "1/4" to 463.0,   // 1852 / 4
-        "3/8" to 694.5,   // 1852 * 3/8
-        "1/2" to 926.0,   // 1852 / 2
-        "3/4" to 1389.0,  // 1852 * 3/4
-    )
+    /** Denominators used for marine-style fraction notation under 1 NM. */
+    private val NM_FRACTION_DENOMINATORS = listOf(2, 4, 8, 16, 32)
 
     private const val METRES_PER_NM = 1852.0
     private const val METRES_PER_SM = 1609.344
@@ -41,13 +36,13 @@ object RangeFormatter {
     private fun formatNm(metres: Int): String {
         val nm = metres / METRES_PER_NM
 
-        // Try matching a known fraction (±5 % tolerance) for sub-1 NM ranges.
+        // Prefer marine-style fractions for sub-1 NM values when close enough.
         if (nm < 1.0) {
-            for ((label, fracMetres) in NM_FRACTIONS) {
-                if (abs(metres - fracMetres) <= fracMetres * 0.05) {
-                    return "$label NM"
-                }
+            val fraction = nmFractionLabel(metres)
+            if (fraction != null) {
+                return "$fraction NM"
             }
+
             // Sub-1 NM but not a known fraction — use 2 decimal places.
             return "%.2f NM".format(nm)
         }
@@ -71,5 +66,35 @@ object RangeFormatter {
             sm < 10.0 -> "%.1f SM".format(sm)
             else -> "%.0f SM".format(sm)
         }
+    }
+
+    private fun nmFractionLabel(metres: Int): String? {
+        var best: Pair<Int, Int>? = null
+        var bestError = Double.MAX_VALUE
+
+        for (denominator in NM_FRACTION_DENOMINATORS) {
+            val numerator = ((metres * denominator) / METRES_PER_NM).roundToInt()
+            if (numerator <= 0 || numerator >= denominator) continue
+
+            val candidateMetres = METRES_PER_NM * numerator / denominator
+            val tolerance = candidateMetres * 0.05
+            val error = abs(metres - candidateMetres)
+            if (error <= tolerance && error < bestError) {
+                best = reduceFraction(numerator, denominator)
+                bestError = error
+            }
+        }
+
+        return best?.let { (n, d) -> "$n/$d" }
+    }
+
+    private fun reduceFraction(numerator: Int, denominator: Int): Pair<Int, Int> {
+        val divisor = gcd(numerator, denominator)
+        return (numerator / divisor) to (denominator / divisor)
+    }
+
+    private tailrec fun gcd(a: Int, b: Int): Int {
+        if (b == 0) return a
+        return gcd(b, a % b)
     }
 }

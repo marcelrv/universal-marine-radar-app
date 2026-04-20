@@ -73,10 +73,11 @@ uniform float u_Zoom;        // visual pinch-zoom factor (≥1.0)
 const float PI = 3.14159265;
 const vec4 BACKGROUND = vec4(0.043, 0.047, 0.063, 1.0); // #0B0C10
 
-// Range rings at 25 %, 50 %, 75 % of maximum range.
+// Range rings at 25 %, 50 %, 75 %, 100 % of maximum range.
 const float R1 = 0.125;  // 25 % of radius 0.5
 const float R2 = 0.250;  // 50 %
 const float R3 = 0.375;  // 75 %
+const float R4 = 0.500;  // 100 % (outer boundary ring)
 
 void main() {
     // Convert fragment position to [-0.5 .. 0.5] centered coordinates.
@@ -108,7 +109,8 @@ void main() {
     // Draw range rings before the texture sample so rings appear on top.
     if (abs(dist - R1) < ringWidth ||
         abs(dist - R2) < ringWidth ||
-        abs(dist - R3) < ringWidth) {
+        abs(dist - R3) < ringWidth ||
+        abs(dist - R4) < ringWidth) {
         gl_FragColor = u_RingColor;
         return;
     }
