@@ -178,6 +178,8 @@ object CapabilitiesMapper {
             id = id,
             name = name,
             type = controlType,
+            category = json.optString("category", "").takeIf { it.isNotEmpty() },
+            units = json.optString("units", "").takeIf { it.isNotEmpty() },
             minValue = if (json.has("minValue")) json.getDouble("minValue").toFloat() else null,
             maxValue = if (json.has("maxValue")) json.getDouble("maxValue").toFloat() else null,
             supportsAuto = json.optBoolean("supportsAuto", false),

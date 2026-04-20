@@ -264,6 +264,37 @@ class CapabilitiesMapperTest {
         assertEquals(ControlType.STRING, fwDef!!.type)
     }
 
+    @Test
+    fun `parseCapabilities parses category and units from control definitions`() {
+        val json = capabilitiesJson(
+            controls = """
+            "operatingTime": {
+                "id": "operatingTime", "name": "Operating time",
+                "category": "info", "dataType": "number",
+                "minValue": 0.0, "maxValue": 4294967295.0,
+                "units": "s", "isReadOnly": true
+            },
+            "gain": {
+                "id": "gain", "name": "Gain",
+                "category": "base", "dataType": "number",
+                "minValue": 0.0, "maxValue": 100.0
+            }
+            """
+        )
+
+        val caps = CapabilitiesMapper.parseCapabilities("r1", json)
+
+        val opDef = caps.controls["operatingTime"]
+        assertNotNull(opDef)
+        assertEquals("info", opDef!!.category)
+        assertEquals("s", opDef.units)
+
+        val gainDef = caps.controls["gain"]
+        assertNotNull(gainDef)
+        assertEquals("base", gainDef!!.category)
+        assertNull(gainDef.units)
+    }
+
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------

@@ -42,6 +42,7 @@ import com.marineyachtradar.mayara.data.model.DistanceUnit
 import com.marineyachtradar.mayara.data.model.RadarOrientation
 import com.marineyachtradar.mayara.data.model.RadarUiState
 import com.marineyachtradar.mayara.ui.connection.ConnectionPickerDialog
+import com.marineyachtradar.mayara.ui.radar.RadarGLRenderer.Companion.DEFAULT_TEXTURE_ANGLE_SIZE
 import com.marineyachtradar.mayara.ui.radar.bottomsheet.RadarControlSheet
 import com.marineyachtradar.mayara.ui.radar.overlay.HudOverlay
 import com.marineyachtradar.mayara.ui.radar.overlay.PowerToggle
@@ -81,7 +82,7 @@ fun RadarScreen(
     val distanceUnit by viewModel.distanceUnit.collectAsState()
 
     val spokesPerRevolution = (uiState as? RadarUiState.Connected)
-        ?.capabilities?.spokesPerRevolution ?: 2048
+        ?.capabilities?.spokesPerRevolution ?: RadarGLRenderer.DEFAULT_TEXTURE_ANGLE_SIZE
     val palette = (uiState as? RadarUiState.Connected)
         ?.controls?.palette ?: ColorPalette.GREEN
 

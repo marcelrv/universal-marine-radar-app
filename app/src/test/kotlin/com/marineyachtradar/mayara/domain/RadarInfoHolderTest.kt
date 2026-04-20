@@ -23,11 +23,12 @@ class RadarInfoHolderTest {
         val snapshot = RadarInfoSnapshot(
             radarName = "Halo 24",
             brand = "Navico",
-            modelName = "Halo 24",
-            serialNumber = "SN-001",
-            firmwareVersion = "1.0.0",
             spokesPerRevolution = 2048,
             maxSpokeLength = 512,
+            infoItems = listOf(
+                RadarInfoItem(name = "Model name", value = "Halo 24"),
+                RadarInfoItem(name = "Operating time", value = "100.0 h"),
+            ),
         )
 
         RadarInfoHolder.update(snapshot)
@@ -35,7 +36,7 @@ class RadarInfoHolderTest {
         assertNotNull(RadarInfoHolder.radarInfo.value)
         assertEquals("Halo 24", RadarInfoHolder.radarInfo.value!!.radarName)
         assertEquals("Navico", RadarInfoHolder.radarInfo.value!!.brand)
-        assertEquals("SN-001", RadarInfoHolder.radarInfo.value!!.serialNumber)
+        assertEquals(2, RadarInfoHolder.radarInfo.value!!.infoItems.size)
     }
 
     @Test

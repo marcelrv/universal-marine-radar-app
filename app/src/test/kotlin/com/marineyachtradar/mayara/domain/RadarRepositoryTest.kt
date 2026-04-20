@@ -54,8 +54,8 @@ class RadarRepositoryTest {
         spokesPerRevolution = 4096,
         maxSpokeLength = 512,
         controls = mapOf(
-            "gain" to ControlDefinition("gain", "Gain", ControlType.RANGE_SLIDER, 0f, 100f),
-            "sea" to ControlDefinition("sea", "Sea Clutter", ControlType.RANGE_SLIDER, 0f, 100f),
+            "gain" to ControlDefinition("gain", "Gain", ControlType.RANGE_SLIDER, minValue = 0f, maxValue = 100f),
+            "sea" to ControlDefinition("sea", "Sea Clutter", ControlType.RANGE_SLIDER, minValue = 0f, maxValue = 100f),
         ),
     )
 

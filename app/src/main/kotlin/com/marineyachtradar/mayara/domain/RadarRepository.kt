@@ -9,6 +9,7 @@ import com.marineyachtradar.mayara.data.model.ControlsState
 import com.marineyachtradar.mayara.data.model.NavigationData
 import com.marineyachtradar.mayara.data.model.PowerState
 import com.marineyachtradar.mayara.data.model.RadarInfo
+import com.marineyachtradar.mayara.data.model.RadarCapabilities
 import com.marineyachtradar.mayara.data.model.RadarOrientation
 import com.marineyachtradar.mayara.data.model.RadarUiState
 import com.marineyachtradar.mayara.data.model.SliderControlState
@@ -172,13 +173,9 @@ class RadarRepository(
                     RadarInfoSnapshot(
                         radarName = radar.name,
                         brand = radar.brand,
-                        modelName = controlValues["modelName"]?.stringValue,
-                        serialNumber = controlValues["serialNumber"]?.stringValue,
-                        firmwareVersion = controlValues["firmwareVersion"]?.stringValue,
                         spokesPerRevolution = capabilities.spokesPerRevolution,
                         maxSpokeLength = capabilities.maxSpokeLength,
-                        operatingTimeSeconds = controlValues["operatingTime"]?.value?.takeIf { it > 0 },
-                        transmitTimeSeconds = controlValues["transmitTime"]?.value?.takeIf { it > 0 },
+                        infoItems = buildInfoItems(capabilities, controlValues),
                     )
                 )
 
@@ -240,13 +237,9 @@ class RadarRepository(
                     RadarInfoSnapshot(
                         radarName = radar.name,
                         brand = radar.brand,
-                        modelName = controlValues["modelName"]?.stringValue,
-                        serialNumber = controlValues["serialNumber"]?.stringValue,
-                        firmwareVersion = controlValues["firmwareVersion"]?.stringValue,
                         spokesPerRevolution = capabilities.spokesPerRevolution,
                         maxSpokeLength = capabilities.maxSpokeLength,
-                        operatingTimeSeconds = controlValues["operatingTime"]?.value?.takeIf { it > 0 },
-                        transmitTimeSeconds = controlValues["transmitTime"]?.value?.takeIf { it > 0 },
+                        infoItems = buildInfoItems(capabilities, controlValues),
                     )
                 )
 
@@ -526,6 +519,54 @@ class RadarRepository(
         PowerState.STANDBY -> 1
         PowerState.TRANSMIT -> 2
         PowerState.WARMUP -> 2  // transitional state — send TRANSMIT
+    }
+
+    /**
+     * Build display items from capabilities controls with `"category": "info"`
+     * and their current values.
+     */
+    private fun buildInfoItems(
+        capabilities: RadarCapabilities,
+        controlValues: Map<String, ControlValue>,
+    ): List<RadarInfoItem> {
+        return capabilities.controls
+            .filter { (_, def) -> def.category == "info" }
+            .mapNotNull { (key, def) ->
+                val cv = controlValues[key]
+                val formatted = formatInfoValue(def, cv) ?: return@mapNotNull null
+                RadarInfoItem(name = def.name, value = formatted)
+            }
+    }
+
+    /**
+     * Format a control value for display, applying unit conversions where appropriate.
+     */
+    private fun formatInfoValue(def: com.marineyachtradar.mayara.data.model.ControlDefinition, cv: ControlValue?): String? {
+        // String controls (model name, custom name, etc.)
+        if (def.type == com.marineyachtradar.mayara.data.model.ControlType.STRING) {
+            return cv?.stringValue?.takeIf { it.isNotBlank() }
+        }
+        val value = cv?.value ?: return null
+        if (value == 0f && def.units == null) return null
+        return when (def.units) {
+            "s" -> formatDuration(value)
+            "K" -> "%.0f °C".format(value - 273.15f)
+            "V" -> "%.1f V".format(value)
+            "A" -> "%.2f A".format(value)
+            else -> {
+                // Integer-like values (spokes, spoke length)
+                if (value == value.toLong().toFloat()) {
+                    value.toLong().toString()
+                } else {
+                    "%.1f".format(value)
+                }
+            }
+        }
+    }
+
+    private fun formatDuration(seconds: Float): String {
+        val hours = seconds / 3600f
+        return if (hours >= 1f) "%.1f h".format(hours) else "%.0f min".format(seconds / 60f)
     }
 }
 

@@ -62,33 +62,6 @@ fun RadarInfoScreen(
                     )
                     HorizontalDivider()
                 }
-                radarInfo.modelName?.let { model ->
-                    item {
-                        ListItem(
-                            headlineContent = { Text("Model") },
-                            trailingContent = { Text(model) },
-                        )
-                        HorizontalDivider()
-                    }
-                }
-                radarInfo.serialNumber?.let { serial ->
-                    item {
-                        ListItem(
-                            headlineContent = { Text("Serial Number") },
-                            trailingContent = { Text(serial) },
-                        )
-                        HorizontalDivider()
-                    }
-                }
-                radarInfo.firmwareVersion?.let { fw ->
-                    item {
-                        ListItem(
-                            headlineContent = { Text("Firmware") },
-                            trailingContent = { Text(fw) },
-                        )
-                        HorizontalDivider()
-                    }
-                }
                 item {
                     ListItem(
                         headlineContent = { Text("Spokes / Revolution") },
@@ -101,30 +74,20 @@ fun RadarInfoScreen(
                         headlineContent = { Text("Max Spoke Length") },
                         trailingContent = { Text("${radarInfo.maxSpokeLength} samples") },
                     )
-                    HorizontalDivider()
+                    if (radarInfo.infoItems.isNotEmpty()) {
+                        HorizontalDivider()
+                    }
                 }
-                item {
-                    ListItem(
-                        headlineContent = { Text("Operating Time") },
-                        trailingContent = {
-                            Text(
-                                radarInfo.operatingTimeSeconds?.let { formatHours(it) }
-                                    ?: "N/A"
-                            )
-                        },
-                    )
-                    HorizontalDivider()
-                }
-                item {
-                    ListItem(
-                        headlineContent = { Text("Transmit Time") },
-                        trailingContent = {
-                            Text(
-                                radarInfo.transmitTimeSeconds?.let { formatHours(it) }
-                                    ?: "N/A"
-                            )
-                        },
-                    )
+                radarInfo.infoItems.forEachIndexed { index, item ->
+                    item {
+                        ListItem(
+                            headlineContent = { Text(item.name) },
+                            trailingContent = { Text(item.value) },
+                        )
+                        if (index < radarInfo.infoItems.lastIndex) {
+                            HorizontalDivider()
+                        }
+                    }
                 }
             } else {
                 item {
@@ -137,14 +100,5 @@ fun RadarInfoScreen(
 
             item { Spacer(Modifier.height(16.dp)) }
         }
-    }
-}
-
-private fun formatHours(seconds: Float): String {
-    val hours = seconds / 3600f
-    return if (hours >= 1f) {
-        "%.1f h".format(hours)
-    } else {
-        "%.0f min".format(seconds / 60f)
     }
 }

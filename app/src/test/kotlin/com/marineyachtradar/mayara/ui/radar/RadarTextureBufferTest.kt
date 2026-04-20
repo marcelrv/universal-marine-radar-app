@@ -23,7 +23,7 @@ class RadarTextureBufferTest {
     }
 
     // -----------------------------------------------------------------------
-    // Column mapping: angle × TEXTURE_SIZE / spokesPerRevolution
+    // Column mapping: angle × textureAngleSize / spokesPerRevolution
     // -----------------------------------------------------------------------
 
     @Test
@@ -34,16 +34,16 @@ class RadarTextureBufferTest {
 
     @Test
     fun `computeColumn maps midpoint angle to middle column`() {
-        // Angle 1024 out of 2048 → exactly column 256 (TEXTURE_SIZE / 2)
+        // Angle 1024 out of 2048 → exactly column 1024 (textureAngleSize / 2)
         val col = renderer.computeColumn(angle = 1024, spokesPerRevolution = 2048)
-        assertEquals(256, col)
+        assertEquals(1024, col)
     }
 
     @Test
     fun `computeColumn clamps angle exceeding spokesPerRevolution to last column`() {
-        // Angle 4096 > 2048 — must not overflow TEXTURE_SIZE - 1
+        // Angle 4096 > 2048 — must not overflow textureAngleSize - 1
         val col = renderer.computeColumn(angle = 4096, spokesPerRevolution = 2048)
-        assertEquals(RadarGLRenderer.TEXTURE_SIZE - 1, col)
+        assertEquals(renderer.textureAngleSize - 1, col)
     }
 
     @Test
@@ -70,7 +70,7 @@ class RadarTextureBufferTest {
         // and verify the column contents through a full update cycle.
         //
         // For pure data verification we use a helper that returns the buffer snapshot.
-        val buffer = ByteArray(RadarGLRenderer.TEXTURE_SIZE * RadarGLRenderer.TEXTURE_SIZE)
+        val buffer = ByteArray(RadarGLRenderer.DEFAULT_TEXTURE_ANGLE_SIZE * RadarGLRenderer.TEXTURE_RANGE_SIZE)
         val helperRenderer = RadarGLRenderer()
         synchronized(helperRenderer) {
             helperRenderer.writeColumn(col, shortSpoke)
@@ -78,7 +78,7 @@ class RadarTextureBufferTest {
         }
         // Verify last row of column is zero (zero-padded).
         // We do this by writing a known non-zero array first, then a short spoke.
-        val fullBuf = ByteArray(RadarGLRenderer.TEXTURE_SIZE) { 0xFF.toByte() }
+        val fullBuf = ByteArray(RadarGLRenderer.TEXTURE_RANGE_SIZE) { 0xFF.toByte() }
         val helperRenderer2 = RadarGLRenderer()
         synchronized(helperRenderer2) {
             helperRenderer2.writeColumn(col, fullBuf)   // all 255
@@ -89,13 +89,47 @@ class RadarTextureBufferTest {
     }
 
     @Test
-    fun `writeColumn truncates spoke data longer than TEXTURE_SIZE`() {
-        // Spoke with more bytes than TEXTURE_SIZE — must not throw ArrayIndexOutOfBounds.
-        val longSpoke = ByteArray(RadarGLRenderer.TEXTURE_SIZE + 100) { 0x7F }
+    fun `writeColumn truncates spoke data longer than TEXTURE_RANGE_SIZE`() {
+        // Spoke with more bytes than TEXTURE_RANGE_SIZE — must not throw ArrayIndexOutOfBounds.
+        val longSpoke = ByteArray(RadarGLRenderer.TEXTURE_RANGE_SIZE + 100) { 0x7F }
         val renderer2 = RadarGLRenderer()
         synchronized(renderer2) {
             renderer2.writeColumn(0, longSpoke) // must not throw
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Dynamic texture sizing via configureForSpokes
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `configureForSpokes rounds up to next power of 2`() {
+        val r = RadarGLRenderer()
+        r.configureForSpokes(1440)  // Garmin: 1440 → 2048
+        assertEquals(2048, r.textureAngleSize)
+    }
+
+    @Test
+    fun `configureForSpokes uses exact power of 2 when already power of 2`() {
+        val r = RadarGLRenderer()
+        r.configureForSpokes(4096)  // Navico HALO: 4096 → 4096
+        assertEquals(4096, r.textureAngleSize)
+    }
+
+    @Test
+    fun `configureForSpokes minimum is 512`() {
+        val r = RadarGLRenderer()
+        r.configureForSpokes(100)  // Very low spoke count → clamped to 512
+        assertEquals(512, r.textureAngleSize)
+    }
+
+    @Test
+    fun `computeColumn adapts after configureForSpokes`() {
+        val r = RadarGLRenderer()
+        r.configureForSpokes(4096)
+        // Midpoint of 4096 spokes should map to midpoint of 4096 columns
+        val col = r.computeColumn(angle = 2048, spokesPerRevolution = 4096)
+        assertEquals(2048, col)
     }
 
     // -----------------------------------------------------------------------

@@ -49,6 +49,11 @@ fun RadarGLView(
 ) {
     val renderer = remember { RadarGLRenderer() }
 
+    // Configure texture angular resolution to match radar's spoke count.
+    LaunchedEffect(spokesPerRevolution) {
+        renderer.configureForSpokes(spokesPerRevolution)
+    }
+
     LaunchedEffect(powerState) {
         if (powerState != null && powerState != PowerState.TRANSMIT) {
             renderer.clearAll()

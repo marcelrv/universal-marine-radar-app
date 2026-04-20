@@ -26,16 +26,25 @@ object RadarInfoHolder {
 }
 
 /**
+ * A single info item for display on the Radar Info screen.
+ * Built dynamically from capabilities controls with `"category": "info"`.
+ */
+data class RadarInfoItem(
+    val name: String,
+    val value: String,
+)
+
+/**
  * Snapshot of radar information for display on the App Info screen.
+ *
+ * [radarName] and [brand] come from the radar list endpoint.
+ * [spokesPerRevolution] and [maxSpokeLength] are top-level capability properties.
+ * [infoItems] are built dynamically from controls with `"category": "info"`.
  */
 data class RadarInfoSnapshot(
     val radarName: String,
     val brand: String,
-    val modelName: String? = null,
-    val serialNumber: String? = null,
-    val firmwareVersion: String? = null,
     val spokesPerRevolution: Int,
     val maxSpokeLength: Int,
-    val operatingTimeSeconds: Float? = null,
-    val transmitTimeSeconds: Float? = null,
+    val infoItems: List<RadarInfoItem> = emptyList(),
 )

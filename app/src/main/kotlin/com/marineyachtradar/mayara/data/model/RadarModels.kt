@@ -79,6 +79,8 @@ data class ControlDefinition(
     val id: String,
     val name: String,
     val type: ControlType,
+    val category: String? = null,
+    val units: String? = null,
     val minValue: Float? = null,
     val maxValue: Float? = null,
     val supportsAuto: Boolean = false,
