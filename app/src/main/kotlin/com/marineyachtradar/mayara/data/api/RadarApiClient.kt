@@ -119,6 +119,33 @@ class RadarApiClient(
         putJson(path, bodyObj.toString())
     }
 
+    /**
+     * Acquire an ARPA target at the given bearing and distance.
+     *
+     * @param radarId The radar's ID.
+     * @param bearingRad True bearing in radians [0, 2π).
+     * @param distanceMeters Range in metres.
+     * @return The server-assigned target ID, or null if the server returns an unexpected response.
+     */
+    suspend fun acquireTarget(radarId: String, bearingRad: Double, distanceMeters: Double): Long? =
+        withContext(Dispatchers.IO) {
+            val path = "$RADARS_PATH/$radarId/targets"
+            val body = JSONObject().apply {
+                put("bearing", bearingRad)
+                put("distance", distanceMeters)
+            }
+            postJson(path, body.toString())?.optLong("targetId")
+        }
+
+    /**
+     * Delete / cancel tracking of an ARPA target.
+     *
+     * A 404 response is silently ignored (target was already gone).
+     */
+    suspend fun deleteTarget(radarId: String, targetId: Long) = withContext(Dispatchers.IO) {
+        deleteEmpty("$RADARS_PATH/$radarId/targets/$targetId")
+    }
+
     // ------------------------------------------------------------------
     // Internal helpers
     // ------------------------------------------------------------------
@@ -155,6 +182,37 @@ class RadarApiClient(
             if (response.code == 404) throw RadarNotFoundException("Not found: $path")
             if (!response.isSuccessful) {
                 throw RadarApiException("HTTP ${response.code} for PUT $path")
+            }
+        }
+    }
+
+    private fun postJson(path: String, body: String): JSONObject? {
+        val requestBody = body.toRequestBody(JSON_MEDIA_TYPE)
+        val request = Request.Builder()
+            .url("$baseUrl$path")
+            .post(requestBody)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (response.code == 404) throw RadarNotFoundException("Not found: $path")
+            if (!response.isSuccessful) {
+                throw RadarApiException("HTTP ${response.code} for POST $path")
+            }
+            val raw = response.body?.string() ?: return null
+            return try { JSONObject(raw) } catch (_: Exception) { null }
+        }
+    }
+
+    private fun deleteEmpty(path: String) {
+        val request = Request.Builder()
+            .url("$baseUrl$path")
+            .delete()
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (response.code == 404) return  // already gone — ignore
+            if (!response.isSuccessful) {
+                throw RadarApiException("HTTP ${response.code} for DELETE $path")
             }
         }
     }

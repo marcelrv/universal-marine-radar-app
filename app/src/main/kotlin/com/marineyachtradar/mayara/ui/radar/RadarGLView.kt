@@ -2,9 +2,12 @@ package com.marineyachtradar.mayara.ui.radar
 
 import android.content.Context
 import android.opengl.GLSurfaceView
+import android.os.Handler
+import android.os.Looper
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
+import android.view.ViewConfiguration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -30,6 +33,13 @@ class RadarPanState {
     var x by mutableFloatStateOf(0f)
     var y by mutableFloatStateOf(0f)
     var zoom by mutableFloatStateOf(1f)
+
+    /** Raw pixel dimensions of the GLSurfaceView; updated before every gesture callback. */
+    var viewWidth: Float = 1f
+    var viewHeight: Float = 1f
+
+    /** Invoked on the main thread after a 1 s long-press with view-local pixel coordinates. */
+    var onLongPress: ((x: Float, y: Float) -> Unit)? = null
 
     /** Reset pan and zoom to defaults (called on range change). */
     fun reset() {
@@ -151,6 +161,9 @@ internal fun createGLSurfaceView(
             return true
         }
     })
+    // Disable GestureDetector's built-in 500 ms long-press so it doesn't interfere
+    // with our custom 1-second handler below.
+    gestureDetector.setIsLongpressEnabled(false)
 
     // Pinch-to-zoom: magnifies the radar view around the current center.
     // Zoom resets to 1× on range change (handled by LaunchedEffect in RadarGLView).
@@ -162,8 +175,41 @@ internal fun createGLSurfaceView(
         }
     })
 
+    // Custom 1-second long-press: fires only for a single stationary finger.
+    val longPressHandler = Handler(Looper.getMainLooper())
+    val touchSlopPx = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
+    var longPressRunnable: Runnable? = null
+    var lpDownX = 0f
+    var lpDownY = 0f
+
+    fun cancelLongPress() {
+        longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
+        longPressRunnable = null
+    }
+
     glView.setOnTouchListener { _, event ->
-        // Feed both detectors; both consume the event.
+        // Keep view dimensions fresh for use in the long-press callback.
+        panState?.let {
+            it.viewWidth = glView.width.toFloat()
+            it.viewHeight = glView.height.toFloat()
+        }
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                lpDownX = event.x
+                lpDownY = event.y
+                cancelLongPress()
+                val r = Runnable { panState?.onLongPress?.invoke(lpDownX, lpDownY) }
+                longPressRunnable = r
+                longPressHandler.postDelayed(r, 1_000L)
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val dx = event.x - lpDownX
+                val dy = event.y - lpDownY
+                if (dx * dx + dy * dy > touchSlopPx * touchSlopPx) cancelLongPress()
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> cancelLongPress()
+            MotionEvent.ACTION_POINTER_DOWN -> cancelLongPress() // second finger → pinch, not long-press
+        }
         gestureDetector.onTouchEvent(event)
         scaleDetector.onTouchEvent(event)
         true

@@ -5,6 +5,7 @@ import com.marineyachtradar.mayara.data.api.RadarApiClient
 import com.marineyachtradar.mayara.data.api.SignalKStreamClient
 import com.marineyachtradar.mayara.data.api.SpokeWebSocketClient
 import com.marineyachtradar.mayara.data.api.StreamUpdate
+import com.marineyachtradar.mayara.data.model.ArpaTarget
 import com.marineyachtradar.mayara.data.model.ColorPalette
 import com.marineyachtradar.mayara.data.model.ControlsState
 import com.marineyachtradar.mayara.data.model.NavigationData
@@ -510,6 +511,7 @@ class RadarRepository(
                             when (message) {
                                 is StreamUpdate.Control -> applyControlUpdate(radarId, message.update)
                                 is StreamUpdate.Navigation -> updateNavigationData(message.data)
+                                is StreamUpdate.Target -> applyTargetUpdate(message)
                             }
                         }
                     // Flow completed normally (server closed connection — e.g. radar power cycle).
@@ -557,6 +559,67 @@ class RadarRepository(
                     controls = state.controls.withSlider(update.controlId, update.value, update.auto)
                 )
             }
+        }
+    }
+
+    private fun applyTargetUpdate(msg: StreamUpdate.Target) {
+        val state = _uiState.value as? RadarUiState.Connected ?: return
+        if (msg.radarId != currentRadarId) return
+        val newTargets = if (msg.target == null) {
+            state.targets - msg.targetId
+        } else {
+            state.targets + (msg.targetId to msg.target)
+        }
+        _uiState.value = state.copy(targets = newTargets)
+        android.util.Log.d("RadarRepository",
+            "Target ${msg.targetId}: ${msg.target?.status ?: "removed"}, " +
+            "total=${newTargets.size}")
+    }
+
+    /**
+     * Acquire an ARPA target at the given position.
+     * Fires a REST POST and logs the result; the target will appear via the stream.
+     */
+    suspend fun acquireTarget(bearingRad: Double, distanceMeters: Double) {
+        val radarId = currentRadarId ?: return
+        try {
+            val targetId = apiClient.acquireTarget(radarId, bearingRad, distanceMeters)
+            android.util.Log.i("RadarRepository",
+                "Acquired target $targetId at bearing=${Math.toDegrees(bearingRad).toInt()}° dist=${distanceMeters.toInt()}m")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("RadarRepository", "acquireTarget failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Delete / stop tracking an ARPA target.
+     */
+    suspend fun deleteTarget(targetId: Long) {
+        val radarId = currentRadarId ?: return
+        try {
+            apiClient.deleteTarget(radarId, targetId)
+            android.util.Log.i("RadarRepository", "Deleted target $targetId")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("RadarRepository", "deleteTarget $targetId failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Clear all ARPA targets via the server's clearTargets button control.
+     */
+    suspend fun clearAllTargets() {
+        val radarId = currentRadarId ?: return
+        try {
+            apiClient.putControl(radarId, "clearTargets", 1f)
+            android.util.Log.i("RadarRepository", "clearAllTargets sent for $radarId")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("RadarRepository", "clearAllTargets failed: ${e.message}")
         }
     }
 

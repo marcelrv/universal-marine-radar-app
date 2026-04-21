@@ -43,6 +43,11 @@ import com.marineyachtradar.mayara.data.model.RadarOrientation
 import com.marineyachtradar.mayara.data.model.RadarUiState
 import com.marineyachtradar.mayara.data.model.SpokeData
 import com.marineyachtradar.mayara.ui.connection.ConnectionPickerDialog
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.min
+import kotlin.math.sin
+import kotlin.math.sqrt
 import com.marineyachtradar.mayara.ui.radar.RadarGLRenderer.Companion.DEFAULT_TEXTURE_ANGLE_SIZE
 import com.marineyachtradar.mayara.ui.radar.bottomsheet.RadarControlSheet
 import com.marineyachtradar.mayara.ui.radar.overlay.HudOverlay
@@ -97,9 +102,14 @@ fun RadarScreen(
     val currentRangeIndex = (uiState as? RadarUiState.Connected)?.currentRangeIndex ?: 0
     val orientation = (uiState as? RadarUiState.Connected)?.controls?.orientation ?: RadarOrientation.HEAD_UP
     val spokeGapFill = (uiState as? RadarUiState.Connected)?.controls?.spokeGapFill ?: false
+    val targets by viewModel.targets.collectAsState()
     val context = LocalContext.current
     val isPortrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
     val panState = remember { RadarPanState() }
+
+    // Actual ship heading in radians — always compass heading regardless of orientation mode.
+    // Used by ARPA target rendering to convert true bearings to screen angles.
+    val headingRad = Math.toRadians((navigationData?.headingDeg ?: 0f).toDouble()).toFloat()
 
     // Compute GL shader rotation (radians) and compass-rose rotation input (degrees).
     // northUp / courseUp: shader rotates the sweep so North/Course is at screen top.
@@ -141,10 +151,12 @@ fun RadarScreen(
             distanceUnit = distanceUnit,
             orientation = orientation,
             headingRotationRad = headingRotationRad,
+            headingRad = headingRad,
             compassHeadingDeg = compassHeadingDeg,
             spokeGapFill = spokeGapFill,
             panState = panState,
             context = context,
+            targets = targets,
         )
     } else {
         LandscapeRadarLayout(
@@ -164,10 +176,12 @@ fun RadarScreen(
             distanceUnit = distanceUnit,
             orientation = orientation,
             headingRotationRad = headingRotationRad,
+            headingRad = headingRad,
             compassHeadingDeg = compassHeadingDeg,
             spokeGapFill = spokeGapFill,
             panState = panState,
             context = context,
+            targets = targets,
         )
     }
 
@@ -185,6 +199,7 @@ fun RadarScreen(
                 onPaletteChange = { viewModel.onPaletteChange(it) },
                 onOrientationChange = { viewModel.onOrientationChange(it) },
                 onSpokeGapFillChange = { viewModel.onSpokeGapFillChange(it) },
+                onClearAllTargets = { viewModel.onClearAllTargets() },
                 onDismiss = { viewModel.onDismissControlSheet() },
             )
         }
@@ -238,10 +253,12 @@ private fun LandscapeRadarLayout(
     distanceUnit: DistanceUnit,
     orientation: RadarOrientation,
     headingRotationRad: Float,
+    headingRad: Float,
     compassHeadingDeg: Float?,
     spokeGapFill: Boolean,
     panState: RadarPanState,
     context: android.content.Context,
+    targets: Map<Long, com.marineyachtradar.mayara.data.model.ArpaTarget> = emptyMap(),
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         RadarGLView(
@@ -308,6 +325,46 @@ private fun LandscapeRadarLayout(
                 Spacer(Modifier.size(48.dp))
             }
         }
+
+        // Target overlay (ARPA/MARPA) — pure drawing; long-press handled by GLSurfaceView.
+        val currentRangeMetersLandscape = ranges.getOrNull(currentRangeIndex) ?: 0
+        panState.onLongPress = { x, y ->
+            val w = panState.viewWidth
+            val h = panState.viewHeight
+            val diameter = min(w, h)
+            val radarRadius = diameter / 2f * panState.zoom
+            val cx = w / 2f + panState.x * diameter
+            val cy = h / 2f - panState.y * diameter
+            val pixelsPerMeter = if (currentRangeMetersLandscape > 0) radarRadius / currentRangeMetersLandscape else 1f
+            val hitTarget = targets.values.firstOrNull { target ->
+                val ab = (target.bearingRad - headingRad + headingRotationRad).toFloat()
+                val distPx = target.distanceMeters * pixelsPerMeter
+                val tx = cx + distPx * sin(ab)
+                val ty = cy - distPx * cos(ab)
+                sqrt((x - tx) * (x - tx) + (y - ty) * (y - ty)) <= 24f
+            }
+            if (hitTarget != null) {
+                viewModel.onDeleteTarget(hitTarget.id)
+            } else {
+                val dx = x - cx
+                val dy = y - cy
+                val distMeters = sqrt(dx * dx + dy * dy) / pixelsPerMeter
+                val screenAngle = atan2(dx, -dy)
+                val twoPi = (2.0 * Math.PI).toFloat()
+                val bearingRad = ((screenAngle + headingRad - headingRotationRad) % twoPi + twoPi) % twoPi
+                viewModel.onLongPress(bearingRad.toDouble(), distMeters.toDouble())
+            }
+        }
+        TargetOverlayCanvas(
+            targets = targets,
+            currentRangeMeters = currentRangeMetersLandscape,
+            headingRotationRad = headingRotationRad,
+            headingRad = headingRad,
+            panX = panState.x,
+            panY = panState.y,
+            zoomLevel = panState.zoom,
+            modifier = Modifier.fillMaxSize(),
+        )
 
         // Top-left (below top bar): HUD overlay
         HudOverlay(
@@ -401,10 +458,12 @@ private fun PortraitRadarLayout(
     distanceUnit: DistanceUnit,
     orientation: RadarOrientation,
     headingRotationRad: Float,
+    headingRad: Float,
     compassHeadingDeg: Float?,
     spokeGapFill: Boolean,
     panState: RadarPanState,
     context: android.content.Context,
+    targets: Map<Long, com.marineyachtradar.mayara.data.model.ArpaTarget> = emptyMap(),
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         RadarGLView(
@@ -427,6 +486,46 @@ private fun PortraitRadarLayout(
             distanceUnit = distanceUnit,
             orientation = orientation,
             headingDeg = compassHeadingDeg,
+            panX = panState.x,
+            panY = panState.y,
+            zoomLevel = panState.zoom,
+            modifier = Modifier.fillMaxSize(),
+        )
+
+        // Target overlay (ARPA/MARPA) — pure drawing; long-press handled by GLSurfaceView.
+        val currentRangeMetersPortrait = ranges.getOrNull(currentRangeIndex) ?: 0
+        panState.onLongPress = { x, y ->
+            val w = panState.viewWidth
+            val h = panState.viewHeight
+            val diameter = min(w, h)
+            val radarRadius = diameter / 2f * panState.zoom
+            val cx = w / 2f + panState.x * diameter
+            val cy = h / 2f - panState.y * diameter
+            val pixelsPerMeter = if (currentRangeMetersPortrait > 0) radarRadius / currentRangeMetersPortrait else 1f
+            val hitTarget = targets.values.firstOrNull { target ->
+                val ab = (target.bearingRad - headingRad + headingRotationRad).toFloat()
+                val distPx = target.distanceMeters * pixelsPerMeter
+                val tx = cx + distPx * sin(ab)
+                val ty = cy - distPx * cos(ab)
+                sqrt((x - tx) * (x - tx) + (y - ty) * (y - ty)) <= 24f
+            }
+            if (hitTarget != null) {
+                viewModel.onDeleteTarget(hitTarget.id)
+            } else {
+                val dx = x - cx
+                val dy = y - cy
+                val distMeters = sqrt(dx * dx + dy * dy) / pixelsPerMeter
+                val screenAngle = atan2(dx, -dy)
+                val twoPi = (2.0 * Math.PI).toFloat()
+                val bearingRad = ((screenAngle + headingRad - headingRotationRad) % twoPi + twoPi) % twoPi
+                viewModel.onLongPress(bearingRad.toDouble(), distMeters.toDouble())
+            }
+        }
+        TargetOverlayCanvas(
+            targets = targets,
+            currentRangeMeters = currentRangeMetersPortrait,
+            headingRotationRad = headingRotationRad,
+            headingRad = headingRad,
             panX = panState.x,
             panY = panState.y,
             zoomLevel = panState.zoom,

@@ -134,6 +134,41 @@ data class SpokeData(
 // UI State
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// ARPA target tracking
+// ---------------------------------------------------------------------------
+
+/**
+ * A tracked ARPA/MARPA target received from the radar server.
+ *
+ * @param bearingRad  True bearing from own ship in radians [0, 2π).
+ * @param distanceMeters  Slant range in metres.
+ * @param courseRad  True course over ground in radians, null until motion is computed.
+ * @param speedMs  Speed over ground in m/s, null until motion is computed.
+ * @param cpaMm  Closest Point of Approach in metres, null until computed.
+ * @param tcpaSec  Time to CPA in seconds, null until computed.
+ */
+data class ArpaTarget(
+    val id: Long,
+    /** "tracking", "acquiring", or "lost" */
+    val status: String,
+    val bearingRad: Double,
+    val distanceMeters: Int,
+    val lat: Double? = null,
+    val lon: Double? = null,
+    val courseRad: Double? = null,
+    val speedMs: Double? = null,
+    val cpaMm: Double? = null,
+    val tcpaSec: Double? = null,
+    /** "manual" or "auto" */
+    val acquisition: String = "manual",
+) {
+    /** True when CPA < 926 m (0.5 NM) and TCPA in (0, 600] s — mirrors webapp danger logic. */
+    val isDangerous: Boolean
+        get() = cpaMm != null && tcpaSec != null &&
+                cpaMm < 926.0 && tcpaSec > 0.0 && tcpaSec <= 600.0 && status == "tracking"
+}
+
 /** Top-level state observed by all Compose screens. */
 sealed interface RadarUiState {
     /** No connection yet / initial state. */
@@ -148,6 +183,7 @@ sealed interface RadarUiState {
         val currentRangeIndex: Int,
         val navigationData: NavigationData?,
         val connectionLabel: String = "",
+        val targets: Map<Long, ArpaTarget> = emptyMap(),
     ) : RadarUiState
 
     /** Server unreachable or fatal error. */

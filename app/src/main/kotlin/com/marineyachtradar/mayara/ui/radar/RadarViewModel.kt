@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.marineyachtradar.mayara.data.api.RadarApiClient
 import com.marineyachtradar.mayara.data.api.SignalKStreamClient
 import com.marineyachtradar.mayara.data.api.SpokeWebSocketClient
+import com.marineyachtradar.mayara.data.model.ArpaTarget
 import com.marineyachtradar.mayara.data.model.ColorPalette
 import com.marineyachtradar.mayara.data.model.ConnectionMode
 import com.marineyachtradar.mayara.data.model.DistanceUnit
@@ -25,6 +26,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.math.atan2
+import kotlin.math.sqrt
 
 private const val TAG = "RadarViewModel"
 
@@ -140,6 +143,11 @@ class RadarViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Revolution counter — incremented each full sweep so GL can clear stale data. */
     val revolutionCount = repository.revolutionCount
+
+    /** ARPA targets derived from [uiState]. */
+    val targets: StateFlow<Map<Long, ArpaTarget>> = uiState
+        .map { (it as? RadarUiState.Connected)?.targets ?: emptyMap() }
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, emptyMap())
 
     /** All radars discovered on the connected server. */
     val availableRadars: StateFlow<List<com.marineyachtradar.mayara.data.model.RadarInfo>> = repository.availableRadars
@@ -422,6 +430,39 @@ class RadarViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onSpokeGapFillChange(enabled: Boolean) {
         repository.setSpokeGapFill(enabled)
+    }
+
+    // ------------------------------------------------------------------
+    // ARPA target acquisition
+    // ------------------------------------------------------------------
+
+    /**
+     * Called when the user long-presses on the radar canvas.
+     *
+     * [bearingRad] is the true bearing in radians [0, 2π) and [distanceMeters] is the
+     * slant range in metres, both pre-computed by the caller from screen coordinates.
+     */
+    fun onLongPress(bearingRad: Double, distanceMeters: Double) {
+        viewModelScope.launch {
+            repository.acquireTarget(bearingRad, distanceMeters)
+        }
+    }
+
+    /**
+     * Delete / stop tracking the ARPA target with the given ID.
+     * Called when the user long-presses on an existing target marker.
+     */
+    fun onDeleteTarget(targetId: Long) {
+        viewModelScope.launch {
+            repository.deleteTarget(targetId)
+        }
+    }
+
+    /** Clear all ARPA targets via the server's clearTargets button control. */
+    fun onClearAllTargets() {
+        viewModelScope.launch {
+            repository.clearAllTargets()
+        }
     }
 
     override fun onCleared() {

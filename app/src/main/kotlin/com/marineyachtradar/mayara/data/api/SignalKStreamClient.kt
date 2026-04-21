@@ -1,5 +1,6 @@
 package com.marineyachtradar.mayara.data.api
 
+import com.marineyachtradar.mayara.data.model.ArpaTarget
 import com.marineyachtradar.mayara.data.model.NavigationData
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -41,6 +42,7 @@ class SignalKStreamClient(
         /** Prefix of SignalK paths that carry radar control updates. */
         private const val RADAR_PATH_PREFIX = "radars."
         private const val CONTROLS_SEGMENT = ".controls."
+        private const val TARGETS_SEGMENT = ".targets."
 
         // SignalK navigation paths (values in SI units: radians, m/s)
         private const val PATH_HEADING_TRUE = "navigation.headingTrue"
@@ -71,6 +73,7 @@ class SignalKStreamClient(
                     if (nav != null) {
                         trySend(StreamUpdate.Navigation(nav))
                     }
+                    parseTargetUpdates(text).forEach { trySend(it) }
                 } catch (_: JSONException) {
                     // Malformed frame — skip silently
                 }
@@ -194,6 +197,72 @@ class SignalKStreamClient(
     }
 
     /**
+     * Parse ARPA target updates from a SignalK delta frame.
+     * Matches paths `radars.{radarId}.targets.{targetId}`.
+     * A null value means the target was lost/deleted.
+     */
+    internal fun parseTargetUpdates(json: String): List<StreamUpdate.Target> {
+        val root = JSONObject(json)
+        val updates = root.optJSONArray("updates") ?: return emptyList()
+        val result = mutableListOf<StreamUpdate.Target>()
+
+        for (i in 0 until updates.length()) {
+            val update = updates.optJSONObject(i) ?: continue
+            val values = update.optJSONArray("values") ?: continue
+            for (j in 0 until values.length()) {
+                val entry = values.optJSONObject(j) ?: continue
+                val path = entry.optString("path") ?: continue
+                if (!path.startsWith(RADAR_PATH_PREFIX)) continue
+                val afterRadars = path.removePrefix(RADAR_PATH_PREFIX)
+                val targetsIdx = afterRadars.indexOf(TARGETS_SEGMENT)
+                if (targetsIdx < 0) continue
+                val radarId = afterRadars.substring(0, targetsIdx)
+                val targetIdStr = afterRadars.substring(targetsIdx + TARGETS_SEGMENT.length)
+                if (radarId.isEmpty() || targetIdStr.isEmpty()) continue
+                val targetId = targetIdStr.toLongOrNull() ?: continue
+
+                val valueObj = entry.optJSONObject("value")
+                val parsedTarget = if (valueObj != null) parseArpaTarget(targetId, valueObj) else null
+                result.add(StreamUpdate.Target(radarId = radarId, targetId = targetId, target = parsedTarget))
+            }
+        }
+        return result
+    }
+
+    private fun parseArpaTarget(id: Long, obj: JSONObject): ArpaTarget {
+        val status = obj.optString("status", "tracking")
+        val position = obj.optJSONObject("position")
+        val bearingRad = position?.optDouble("bearing", 0.0) ?: 0.0
+        val distanceMeters = (position?.optDouble("distance", 0.0) ?: 0.0).toInt()
+        val lat = position?.optDouble("latitude")?.takeIf { !it.isNaN() }
+        val lon = position?.optDouble("longitude")?.takeIf { !it.isNaN() }
+
+        val motion = obj.optJSONObject("motion")
+        val courseRad = motion?.optDouble("course")?.takeIf { !it.isNaN() }
+        val speedMs = motion?.optDouble("speed")?.takeIf { !it.isNaN() }
+
+        val danger = obj.optJSONObject("danger")
+        val cpaMm = danger?.optDouble("cpa")?.takeIf { !it.isNaN() }
+        val tcpaSec = danger?.optDouble("tcpa")?.takeIf { !it.isNaN() }
+
+        val acquisition = obj.optString("acquisition", "manual")
+
+        return ArpaTarget(
+            id = id,
+            status = status,
+            bearingRad = bearingRad,
+            distanceMeters = distanceMeters,
+            lat = lat,
+            lon = lon,
+            courseRad = courseRad,
+            speedMs = speedMs,
+            cpaMm = cpaMm,
+            tcpaSec = tcpaSec,
+            acquisition = acquisition,
+        )
+    }
+
+    /**
      * Parse `radars.{radarId}.controls.{controlId}` → Pair(radarId, controlId), or null if
      * the path doesn't match.
      */
@@ -217,6 +286,8 @@ sealed interface StreamUpdate {
     data class Control(val update: ControlUpdate) : StreamUpdate
     /** Navigation sensor data received (heading, COG, SOG). */
     data class Navigation(val data: NavigationData) : StreamUpdate
+    /** An ARPA target was created, updated, or deleted ([target] is null when deleted). */
+    data class Target(val radarId: String, val targetId: Long, val target: ArpaTarget?) : StreamUpdate
 }
 
 /**
