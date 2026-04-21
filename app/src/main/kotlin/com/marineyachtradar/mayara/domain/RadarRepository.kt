@@ -4,6 +4,7 @@ import com.marineyachtradar.mayara.data.api.ControlUpdate
 import com.marineyachtradar.mayara.data.api.RadarApiClient
 import com.marineyachtradar.mayara.data.api.SignalKStreamClient
 import com.marineyachtradar.mayara.data.api.SpokeWebSocketClient
+import com.marineyachtradar.mayara.data.api.StreamUpdate
 import com.marineyachtradar.mayara.data.model.ColorPalette
 import com.marineyachtradar.mayara.data.model.ControlsState
 import com.marineyachtradar.mayara.data.model.NavigationData
@@ -388,10 +389,21 @@ class RadarRepository(
         }
     }
 
-    /** Update navigation data (heading, SOG, COG) from an external NMEA/SignalK source. */
+    /** Update navigation data (heading, SOG, COG) from an external NMEA/SignalK source.
+     *  Merges with existing values: only non-null fields in [navData] overwrite prior values. */
     fun updateNavigationData(navData: NavigationData?) {
         val state = _uiState.value as? RadarUiState.Connected ?: return
-        _uiState.value = state.copy(navigationData = navData)
+        if (navData == null) {
+            _uiState.value = state.copy(navigationData = null)
+            return
+        }
+        val existing = state.navigationData
+        val merged = NavigationData(
+            headingDeg = navData.headingDeg ?: existing?.headingDeg,
+            sogKnots   = navData.sogKnots   ?: existing?.sogKnots,
+            cogDeg     = navData.cogDeg     ?: existing?.cogDeg,
+        )
+        _uiState.value = state.copy(navigationData = merged)
     }
 
     /** Set the connection label shown in the HUD (e.g. "Embedded (127.0.0.1:6502)"). */
@@ -414,16 +426,31 @@ class RadarRepository(
                         .collect { spoke ->
                             consecutiveFailures = 0
                             _spokeFlow.tryEmit(spoke)
+
+                            // Extract heading from spoke data (same logic as webapp):
+                            // heading = (bearing + spokesPerRevolution - angle) % spokesPerRevolution
+                            val connState = _uiState.value as? RadarUiState.Connected
+                            if (spoke.bearing != null && connState != null) {
+                                val spokes = connState.capabilities.spokesPerRevolution
+                                val headingSpoke = (spoke.bearing + spokes - spoke.angle) % spokes
+                                val headingDeg = (headingSpoke.toFloat() / spokes) * 360f
+                                val existing = connState.navigationData
+                                // Only update if changed by more than 0.5 degrees
+                                if (existing?.headingDeg == null || Math.abs(headingDeg - (existing.headingDeg)) > 0.5f) {
+                                    updateNavigationData(NavigationData(headingDeg = headingDeg, sogKnots = null, cogDeg = null))
+                                }
+                            }
+
                             if (spoke.rangeMetres > 0 && (lastRangeUpdateAngle < 0 || spoke.angle < lastRangeUpdateAngle)) {
                                 lastRangeUpdateAngle = spoke.angle
                                 _revolutionCount.value++
-                                val state = _uiState.value as? RadarUiState.Connected ?: return@collect
+                                val stateNow = _uiState.value as? RadarUiState.Connected ?: return@collect
                                 val received = spoke.rangeMetres
-                                val idx = state.capabilities.ranges.indexOfFirst {
+                                val idx = stateNow.capabilities.ranges.indexOfFirst {
                                     Math.abs(it - received) <= maxOf(1, (it * 0.05).toInt())
                                 }
-                                if (idx >= 0 && idx != state.currentRangeIndex) {
-                                    _uiState.value = state.copy(currentRangeIndex = idx)
+                                if (idx >= 0 && idx != stateNow.currentRangeIndex) {
+                                    _uiState.value = stateNow.copy(currentRangeIndex = idx)
                                 }
                             } else {
                                 lastRangeUpdateAngle = spoke.angle
@@ -463,9 +490,12 @@ class RadarRepository(
             while (isActive) {
                 try {
                     streamClient.connect(streamUrl)
-                        .collect { update ->
+                        .collect { message ->
                             consecutiveFailures = 0
-                            applyControlUpdate(radarId, update)
+                            when (message) {
+                                is StreamUpdate.Control -> applyControlUpdate(radarId, message.update)
+                                is StreamUpdate.Navigation -> updateNavigationData(message.data)
+                            }
                         }
                     // Flow completed normally (server closed connection — e.g. radar power cycle).
                     consecutiveFailures++

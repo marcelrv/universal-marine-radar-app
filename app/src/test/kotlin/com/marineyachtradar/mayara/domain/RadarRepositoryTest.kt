@@ -2,6 +2,7 @@ package com.marineyachtradar.mayara.domain
 
 import app.cash.turbine.test
 import com.marineyachtradar.mayara.data.api.ControlUpdate
+import com.marineyachtradar.mayara.data.api.StreamUpdate
 import com.marineyachtradar.mayara.data.api.RadarApiClient
 import com.marineyachtradar.mayara.data.api.RadarApiException
 import com.marineyachtradar.mayara.data.api.SignalKStreamClient
@@ -186,7 +187,7 @@ class RadarRepositoryTest {
             controlId = "power",
             value = 0f,
         )
-        every { streamClient.connect(any()) } returns flowOf(powerUpdate)
+        every { streamClient.connect(any()) } returns flowOf(StreamUpdate.Control(powerUpdate))
         coEvery { apiClient.getRadars() } returns listOf(testRadar)
         coEvery { apiClient.getCapabilities("emulator_1") } returns testCapabilities
         coEvery { apiClient.getControls("emulator_1") } returns testControlValues
@@ -381,7 +382,7 @@ class RadarRepositoryTest {
             controlId = "power",
             value = 99f,
         )
-        every { streamClient.connect(any()) } returns flowOf(powerUpdate)
+        every { streamClient.connect(any()) } returns flowOf(StreamUpdate.Control(powerUpdate))
         coEvery { apiClient.getRadars() } returns listOf(testRadar)
         coEvery { apiClient.getCapabilities("emulator_1") } returns testCapabilities
         coEvery { apiClient.getControls("emulator_1") } returns testControlValues

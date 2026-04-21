@@ -101,6 +101,28 @@ fun RadarScreen(
     val isPortrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
     val panState = remember { RadarPanState() }
 
+    // Compute GL shader rotation (radians) and compass-rose rotation input (degrees).
+    // northUp / courseUp: shader rotates the sweep so North/Course is at screen top.
+    // headingUp: no shader rotation; the compass rose labels rotate instead.
+    val headingRotationRad: Float
+    val compassHeadingDeg: Float?
+    when (orientation) {
+        RadarOrientation.NORTH_UP -> {
+            val h = navigationData?.headingDeg ?: 0f
+            headingRotationRad = Math.toRadians(h.toDouble()).toFloat()
+            compassHeadingDeg = null   // rose is static (N at top)
+        }
+        RadarOrientation.COURSE_UP -> {
+            val c = navigationData?.cogDeg ?: navigationData?.headingDeg ?: 0f
+            headingRotationRad = Math.toRadians(c.toDouble()).toFloat()
+            compassHeadingDeg = null   // rose is static (course at top)
+        }
+        RadarOrientation.HEAD_UP -> {
+            headingRotationRad = 0f
+            compassHeadingDeg = navigationData?.headingDeg  // rose rotates by -heading
+        }
+    }
+
     if (isPortrait) {
         PortraitRadarLayout(
             viewModel = viewModel,
@@ -118,6 +140,8 @@ fun RadarScreen(
             currentRangeIndex = currentRangeIndex,
             distanceUnit = distanceUnit,
             orientation = orientation,
+            headingRotationRad = headingRotationRad,
+            compassHeadingDeg = compassHeadingDeg,
             spokeGapFill = spokeGapFill,
             panState = panState,
             context = context,
@@ -139,6 +163,8 @@ fun RadarScreen(
             currentRangeIndex = currentRangeIndex,
             distanceUnit = distanceUnit,
             orientation = orientation,
+            headingRotationRad = headingRotationRad,
+            compassHeadingDeg = compassHeadingDeg,
             spokeGapFill = spokeGapFill,
             panState = panState,
             context = context,
@@ -211,6 +237,8 @@ private fun LandscapeRadarLayout(
     currentRangeIndex: Int,
     distanceUnit: DistanceUnit,
     orientation: RadarOrientation,
+    headingRotationRad: Float,
+    compassHeadingDeg: Float?,
     spokeGapFill: Boolean,
     panState: RadarPanState,
     context: android.content.Context,
@@ -226,6 +254,7 @@ private fun LandscapeRadarLayout(
             revolutionCount = revolutionCount,
             currentRangeIndex = currentRangeIndex,
             spokeGapFill = spokeGapFill,
+            headingRotationRad = headingRotationRad,
             panState = panState,
             modifier = Modifier.fillMaxSize(),
         )
@@ -233,6 +262,8 @@ private fun LandscapeRadarLayout(
             ranges = ranges,
             currentRangeIndex = currentRangeIndex,
             distanceUnit = distanceUnit,
+            orientation = orientation,
+            headingDeg = compassHeadingDeg,
             panX = panState.x,
             panY = panState.y,
             zoomLevel = panState.zoom,
@@ -369,6 +400,8 @@ private fun PortraitRadarLayout(
     currentRangeIndex: Int,
     distanceUnit: DistanceUnit,
     orientation: RadarOrientation,
+    headingRotationRad: Float,
+    compassHeadingDeg: Float?,
     spokeGapFill: Boolean,
     panState: RadarPanState,
     context: android.content.Context,
@@ -384,6 +417,7 @@ private fun PortraitRadarLayout(
             revolutionCount = revolutionCount,
             currentRangeIndex = currentRangeIndex,
             spokeGapFill = spokeGapFill,
+            headingRotationRad = headingRotationRad,
             panState = panState,
             modifier = Modifier.fillMaxSize(),
         )
@@ -391,6 +425,8 @@ private fun PortraitRadarLayout(
             ranges = ranges,
             currentRangeIndex = currentRangeIndex,
             distanceUnit = distanceUnit,
+            orientation = orientation,
+            headingDeg = compassHeadingDeg,
             panX = panState.x,
             panY = panState.y,
             zoomLevel = panState.zoom,

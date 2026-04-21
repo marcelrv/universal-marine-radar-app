@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.sp
 import com.marineyachtradar.mayara.data.model.DistanceUnit
+import com.marineyachtradar.mayara.data.model.RadarOrientation
 import com.marineyachtradar.mayara.ui.radar.overlay.RangeFormatter
 import kotlin.math.cos
 import kotlin.math.min
@@ -26,19 +27,35 @@ private val RING_LABEL_COLOR = Color(0xBBCCCCCC)
  *
  * Draws:
  * - **Compass rose**: tick marks every 10°, labels every 30° (N, 30, 60, …, 330)
+ *   - headingUp: rose rotates by -heading so the ship's bearing is at top
+ *   - northUp / courseUp: rose is static (N at top); the GL shader rotates the sweep
  * - **Range ring labels**: range value at 45° on each ring (25 %, 50 %, 75 %)
+ *
+ * @param orientation Current radar orientation mode.
+ * @param headingDeg  Ship heading in degrees (true). Used to rotate the rose in headingUp mode.
+ *                    Pass COG here for courseUp mode.
  */
 @Composable
 fun RadarOverlayCanvas(
     ranges: List<Int>,
     currentRangeIndex: Int,
     distanceUnit: DistanceUnit,
+    orientation: RadarOrientation = RadarOrientation.HEAD_UP,
+    headingDeg: Float? = null,
     panX: Float = 0f,
     panY: Float = 0f,
     zoomLevel: Float = 1f,
     modifier: Modifier = Modifier,
 ) {
     val currentRange = ranges.getOrNull(currentRangeIndex) ?: 0
+
+    // In headingUp mode: rotate compass labels opposite to heading so the bow stays at top
+    // and geographic bearings are shown correctly. In northUp/courseUp the GL shader already
+    // rotated the sweep — the compass rose stays static (N at top).
+    val roseRotationDeg = when (orientation) {
+        RadarOrientation.HEAD_UP -> -(headingDeg ?: 0f)
+        RadarOrientation.NORTH_UP, RadarOrientation.COURSE_UP -> 0f
+    }
 
     Canvas(modifier = modifier) {
         val radarDiameter = min(size.width, size.height)
@@ -47,7 +64,7 @@ fun RadarOverlayCanvas(
         val radius = radarDiameter / 2f
 
         scale(zoomLevel, pivot = Offset(cx, cy)) {
-            drawCompassRose(cx, cy, radius)
+            drawCompassRose(cx, cy, radius, roseRotationDeg)
             if (currentRange > 0) {
                 drawRangeLabels(cx, cy, radius, currentRange, distanceUnit)
             }
@@ -57,8 +74,12 @@ fun RadarOverlayCanvas(
 
 /**
  * Draw compass rose: ticks every 10°, labels every 30°.
+ *
+ * @param roseRotationDeg Offset applied to all label positions.
+ *   - headingUp: pass `-headingDeg` so the bow stays at top and N rotates away.
+ *   - northUp / courseUp: pass `0f` (rose is static, N always at top).
  */
-private fun DrawScope.drawCompassRose(cx: Float, cy: Float, radius: Float) {
+private fun DrawScope.drawCompassRose(cx: Float, cy: Float, radius: Float, roseRotationDeg: Float = 0f) {
     val tickOuterRadius = radius * 0.99f
     val majorTickLength = radius * 0.06f    // 30° ticks
     val minorTickLength = radius * 0.03f    // 10° ticks
@@ -80,7 +101,10 @@ private fun DrawScope.drawCompassRose(cx: Float, cy: Float, radius: Float) {
     }
 
     for (deg in 0 until 360 step 10) {
-        val radians = Math.toRadians(deg.toDouble()).toFloat()
+        // Apply rose rotation: in headingUp mode the entire rose rotates so the geographic
+        // bearing labels are shown at their correct screen positions.
+        val displayDeg = (deg + roseRotationDeg).toDouble()
+        val radians = Math.toRadians(displayDeg).toFloat()
         val sinA = sin(radians)
         val cosA = cos(radians)
 

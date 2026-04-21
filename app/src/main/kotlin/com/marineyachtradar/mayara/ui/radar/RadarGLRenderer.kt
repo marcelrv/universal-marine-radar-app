@@ -79,6 +79,7 @@ uniform vec2 u_Resolution;   // viewport size in pixels
 uniform vec4 u_RingColor;    // range ring colour (palette-aware)
 uniform float u_Scale;       // scale factor for portrait mode (≥1.0)
 uniform float u_Zoom;        // visual pinch-zoom factor (≥1.0)
+uniform float u_Rotation;    // heading rotation in radians (northUp/courseUp modes)
 
 const float PI = 3.14159265;
 const vec4 BACKGROUND = vec4(0.043, 0.047, 0.063, 1.0); // #0B0C10
@@ -130,6 +131,8 @@ void main() {
 
     // atan(x, y): angle measured clockwise from North (y-up), result in [-PI..PI].
     float angle = atan(radarPos.x, radarPos.y);
+    // Apply heading rotation: subtract heading so the sweep rotates to match orientation mode.
+    angle = angle - u_Rotation;
     // Map angle to [0..1], starting at North.
     float u = fract(angle / (2.0 * PI));
 
@@ -158,6 +161,7 @@ void main() {
     private var ringColorUniform = 0
     private var scaleUniform = 0
     private var zoomUniform = 0
+    private var rotationUniform = 0
     private var radarTexture = 0
     private var paletteTexture = 0
     private var quadVbo = 0
@@ -209,6 +213,10 @@ void main() {
 
     @Volatile
     internal var zoomLevel = 1f
+
+    /** Heading rotation in radians for northUp/courseUp modes. 0 = headingUp (no rotation). */
+    @Volatile
+    var headingRotationRad = 0f
 
     // -----------------------------------------------------------------------
     // Palette state
@@ -431,6 +439,7 @@ void main() {
         ringColorUniform = GLES20.glGetUniformLocation(programHandle, "u_RingColor")
         scaleUniform     = GLES20.glGetUniformLocation(programHandle, "u_Scale")
         zoomUniform      = GLES20.glGetUniformLocation(programHandle, "u_Zoom")
+        rotationUniform  = GLES20.glGetUniformLocation(programHandle, "u_Rotation")
 
         // Create and initialise radar texture (all zeros = no signal = black)
         val texHandles = IntArray(2)
@@ -539,6 +548,9 @@ void main() {
 
         // Upload zoom factor
         GLES20.glUniform1f(zoomUniform, zoomLevel)
+
+        // Upload heading rotation (0 in headingUp mode, heading/COG in northUp/courseUp)
+        GLES20.glUniform1f(rotationUniform, headingRotationRad)
 
         // Upload palette-aware ring color
         val rc = ringColorForPalette(activePalette)

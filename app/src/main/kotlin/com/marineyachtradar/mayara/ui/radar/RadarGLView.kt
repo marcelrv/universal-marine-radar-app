@@ -50,6 +50,7 @@ fun RadarGLView(
     revolutionCount: Long = 0L,
     currentRangeIndex: Int = 0,
     spokeGapFill: Boolean = false,
+    headingRotationRad: Float = 0f,
     panState: RadarPanState? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -83,6 +84,12 @@ fun RadarGLView(
 
     LaunchedEffect(spokeGapFill) {
         renderer.fillGapsEnabled = spokeGapFill
+    }
+
+    // Update heading rotation whenever orientation mode or navigation data changes.
+    // headingRotationRad is @Volatile, so just assigning it is safe from any thread.
+    LaunchedEffect(headingRotationRad) {
+        renderer.headingRotationRad = headingRotationRad
     }
 
     // Collect every spoke on a background thread and post each to the GL thread via
