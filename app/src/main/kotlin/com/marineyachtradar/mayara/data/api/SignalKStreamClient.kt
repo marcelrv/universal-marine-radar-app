@@ -46,6 +46,7 @@ class SignalKStreamClient(
         private const val PATH_HEADING_TRUE = "navigation.headingTrue"
         private const val PATH_COG_TRUE = "navigation.courseOverGroundTrue"
         private const val PATH_SOG = "navigation.speedOverGround"
+        private const val PATH_POSITION = "navigation.position"
         private const val M_S_TO_KNOTS = 1.94384f
         private const val RAD_TO_DEG = (180.0 / Math.PI).toFloat()
     }
@@ -149,6 +150,8 @@ class SignalKStreamClient(
         var headingDeg: Float? = null
         var cogDeg: Float? = null
         var sogKnots: Float? = null
+        var latDeg: Double? = null
+        var lonDeg: Double? = null
 
         for (i in 0 until updates.length()) {
             val update = updates.optJSONObject(i) ?: continue
@@ -169,12 +172,22 @@ class SignalKStreamClient(
                         val ms = entry.optDouble("value", Double.NaN)
                         if (!ms.isNaN()) sogKnots = (ms * M_S_TO_KNOTS).toFloat()
                     }
+                    PATH_POSITION -> {
+                        val pos = entry.optJSONObject("value") ?: continue
+                        val lat = pos.optDouble("latitude", Double.NaN)
+                        val lon = pos.optDouble("longitude", Double.NaN)
+                        if (!lat.isNaN() && !lon.isNaN()) {
+                            latDeg = lat
+                            lonDeg = lon
+                        }
+                    }
                 }
             }
         }
 
-        return if (headingDeg != null || cogDeg != null || sogKnots != null) {
-            NavigationData(headingDeg = headingDeg, sogKnots = sogKnots, cogDeg = cogDeg)
+        return if (headingDeg != null || cogDeg != null || sogKnots != null || latDeg != null) {
+            NavigationData(headingDeg = headingDeg, sogKnots = sogKnots, cogDeg = cogDeg,
+                latDeg = latDeg, lonDeg = lonDeg)
         } else {
             null
         }

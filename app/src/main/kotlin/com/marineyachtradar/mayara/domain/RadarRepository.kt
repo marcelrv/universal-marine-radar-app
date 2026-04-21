@@ -402,6 +402,8 @@ class RadarRepository(
             headingDeg = navData.headingDeg ?: existing?.headingDeg,
             sogKnots   = navData.sogKnots   ?: existing?.sogKnots,
             cogDeg     = navData.cogDeg     ?: existing?.cogDeg,
+            latDeg     = navData.latDeg     ?: existing?.latDeg,
+            lonDeg     = navData.lonDeg     ?: existing?.lonDeg,
         )
         _uiState.value = state.copy(navigationData = merged)
     }
@@ -430,14 +432,27 @@ class RadarRepository(
                             // Extract heading from spoke data (same logic as webapp):
                             // heading = (bearing + spokesPerRevolution - angle) % spokesPerRevolution
                             val connState = _uiState.value as? RadarUiState.Connected
-                            if (spoke.bearing != null && connState != null) {
-                                val spokes = connState.capabilities.spokesPerRevolution
-                                val headingSpoke = (spoke.bearing + spokes - spoke.angle) % spokes
-                                val headingDeg = (headingSpoke.toFloat() / spokes) * 360f
+                            val hasNavUpdate = spoke.bearing != null || spoke.lat != null
+                            if (hasNavUpdate && connState != null) {
+                                var headingDeg: Float? = null
+                                if (spoke.bearing != null) {
+                                    val spokes = connState.capabilities.spokesPerRevolution
+                                    val headingSpoke = (spoke.bearing + spokes - spoke.angle) % spokes
+                                    headingDeg = (headingSpoke.toFloat() / spokes) * 360f
+                                }
                                 val existing = connState.navigationData
-                                // Only update if changed by more than 0.5 degrees
-                                if (existing?.headingDeg == null || Math.abs(headingDeg - (existing.headingDeg)) > 0.5f) {
-                                    updateNavigationData(NavigationData(headingDeg = headingDeg, sogKnots = null, cogDeg = null))
+                                val headingChanged = headingDeg != null &&
+                                    (existing?.headingDeg == null || Math.abs(headingDeg - (existing.headingDeg)) > 0.5f)
+                                val posChanged = spoke.lat != null &&
+                                    (existing?.latDeg == null || Math.abs(spoke.lat - (existing.latDeg)) > 0.00001)
+                                if (headingChanged || posChanged) {
+                                    updateNavigationData(NavigationData(
+                                        headingDeg = headingDeg,
+                                        sogKnots = null,
+                                        cogDeg = null,
+                                        latDeg = spoke.lat,
+                                        lonDeg = spoke.lon,
+                                    ))
                                 }
                             }
 

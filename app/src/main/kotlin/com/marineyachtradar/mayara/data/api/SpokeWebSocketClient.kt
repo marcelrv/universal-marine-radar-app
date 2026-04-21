@@ -57,6 +57,8 @@ class SpokeWebSocketClient(
                             bearing = spoke.bearing,
                             rangeMetres = spoke.range,
                             data = spoke.data_.toByteArray(),
+                            lat = spoke.lat,
+                            lon = spoke.lon,
                         )
                         // trySend is non-blocking; drops silently if buffer is full (back-pressure)
                         trySend(spokeData)

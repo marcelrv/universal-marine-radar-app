@@ -190,8 +190,19 @@ Improvements
 
 - [ ] ARPA target tracking overlay
 - [ ] AIS overlay
-- [ ] Dual-range display mode
-- [ ] Doppler colour coding
-- [ ] Recording playback (pcap replay mode)
-- [ ] TLS support for remote `mayara-server`
 - [ ] Tablet landscape layout with floating bottom sheet
+
+### phase II
+Now that the core application is functional, here are the recommended improvements for the next iterations to make it marine-ready:
+1. Thermal & Battery Management (Adaptive Rendering)
+Issue: Rendering OpenGL at 2048 spokes per second constantly will drain mobile batteries rapidly and cause thermal throttling.
+Solution: Implement a dynamic render loop. If the user hasn't touched the screen in 10 seconds, drop the visual OpenGL refresh rate to 30 FPS, even though the internal Kotlin WebSocket flow continues processing the full 2048 spokes silently. Pause OpenGL rendering entirely onPause() when the app goes to the background.
+2. JNI Panic Handling
+Issue: If the Rust mayara-server encounters a fatal error (e.g., a hardware network timeout) and panics, it will instantly crash the entire Android application without a stack trace.
+Solution: Implement catch_unwind in the mayara-jni Rust bridge. If a panic occurs, safely catch it in Rust, translate it into an error string, and throw a native Kotlin Exception back to the UI to show a clean "Connection Lost" modal.
+3. Wake-Locks & Screen Management
+Feature: Add an Android FLAG_KEEP_SCREEN_ON rule whenever the radar state is in TRANSMIT. Boaters cannot afford to have their phone screen go to sleep/lock automatically while navigating through fog or at night.
+4. AIS Target Overlay via SignalK
+Feature: Since the app already connects to SignalK for Heading/SOG (HUD Overlay), the next logical step is to parse AIS (Automatic Identification System) targets from the SignalK stream. You can pass these coordinates into the OpenGL canvas to render standard marine AIS triangles directly on top of the radar echoes.
+5. Foreground Service Persistence
+Feature: Ensure that when the embedded Standalone server is running, Android triggers a Foreground Service with a sticky notification (e.g., "Radar Server Active"). Otherwise, modern Android OS memory management will kill the embedded Rust server aggressively if the user switches to a different app (like a weather app) for more than a few seconds.

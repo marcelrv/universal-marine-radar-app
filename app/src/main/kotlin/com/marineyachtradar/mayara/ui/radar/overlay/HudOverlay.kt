@@ -9,9 +9,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.marineyachtradar.mayara.data.model.NavigationData
+import kotlin.math.abs
+import kotlin.math.floor
 
 /**
- * HUD overlay displaying connection label, heading, SOG, and COG.
+ * HUD overlay displaying connection label, position, heading, SOG, and COG.
  *
  * The navigation rows are absent when [navigationData] is null.
  * The connection label is shown when non-blank regardless of navigation data.
@@ -34,6 +36,12 @@ fun HudOverlay(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
             )
         }
+        navigationData?.latDeg?.let { lat ->
+            HudRow(label = "LAT", value = formatDms(lat, isLat = true))
+        }
+        navigationData?.lonDeg?.let { lon ->
+            HudRow(label = "LON", value = formatDms(lon, isLat = false))
+        }
         navigationData?.headingDeg?.let { heading ->
             HudRow(label = "HDG", value = "%.1f°".format(heading))
         }
@@ -44,6 +52,17 @@ fun HudOverlay(
             HudRow(label = "COG", value = "%.1f°".format(cog))
         }
     }
+}
+
+/** Format decimal degrees to D°MM'SS.S" N/S or E/W. */
+private fun formatDms(deg: Double, isLat: Boolean): String {
+    val abs = abs(deg)
+    val d = floor(abs).toInt()
+    val mFull = (abs - d) * 60.0
+    val m = floor(mFull).toInt()
+    val s = (mFull - m) * 60.0
+    val dir = if (isLat) (if (deg >= 0) "N" else "S") else (if (deg >= 0) "E" else "W")
+    return "%d°%02d'%04.1f\" %s".format(d, m, s, dir)
 }
 
 @Composable

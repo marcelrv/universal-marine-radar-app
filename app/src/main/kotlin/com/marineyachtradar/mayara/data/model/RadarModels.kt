@@ -102,6 +102,10 @@ data class SpokeData(
     val rangeMetres: Int,
     /** Raw radar intensity bytes: index 0 = nearest, last = farthest. */
     val data: ByteArray,
+    /** Latitude of the radar at spoke generation time (degrees). */
+    val lat: Double? = null,
+    /** Longitude of the radar at spoke generation time (degrees). */
+    val lon: Double? = null,
 ) {
     // ByteArray requires manual equals/hashCode to avoid identity comparison.
     override fun equals(other: Any?): Boolean {
@@ -110,6 +114,8 @@ data class SpokeData(
         return angle == other.angle &&
                 bearing == other.bearing &&
                 rangeMetres == other.rangeMetres &&
+                lat == other.lat &&
+                lon == other.lon &&
                 data.contentEquals(other.data)
     }
 
@@ -117,6 +123,8 @@ data class SpokeData(
         var result = angle
         result = 31 * result + (bearing ?: 0)
         result = 31 * result + rangeMetres
+        result = 31 * result + (lat?.hashCode() ?: 0)
+        result = 31 * result + (lon?.hashCode() ?: 0)
         result = 31 * result + data.contentHashCode()
         return result
     }
@@ -180,6 +188,8 @@ data class NavigationData(
     val headingDeg: Float?,
     val sogKnots: Float?,
     val cogDeg: Float?,
+    val latDeg: Double? = null,
+    val lonDeg: Double? = null,
 )
 
 /** Distance unit preference for range display (spec §3.5 — Units & Formats). */
