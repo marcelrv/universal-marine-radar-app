@@ -13,7 +13,7 @@ The app displays real-time radar data from supported radar hardware with full ra
 
 ## Supported Radar Brands
 
-Fully supported and tested with real hardware:
+Fully supported and tested with real hardware (based on supported hardware by mayara-server, not conformed for the android app yet):
 
 - **Navico** — BR24, 3G, 4G, HALO 20, HALO 20+, HALO 24, HALO 2000–6000
 - **Raymarine** — Quantum, RD series
@@ -43,6 +43,7 @@ Implemented but awaiting real-hardware validation:
 - **Portrait & landscape** — Layout automatically adapts to device orientation.
 - **Multi-radar** — When the server exposes more than one radar, tap the
   radar name pill to switch.
+- **ARPA target tracking** with CPA/TCPA
 
 ## Building & Architecture
 
@@ -65,5 +66,5 @@ high-quality radar software freely available to the marine community.
 This application is licensed under the **GNU General Public License v2.0**
 (GPL-2.0). See [LICENSE](LICENSE) for details.
 
-The embedded **mayara-server** library is also GPL-2.0 licensed —
+The embedded **mayara-server** library is Apache 2.0 licensed —
 see the [mayara project](https://github.com/MarineYachtRadar/mayara-servera) for details.
