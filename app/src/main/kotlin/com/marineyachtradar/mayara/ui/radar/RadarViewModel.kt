@@ -1,6 +1,7 @@
 package com.marineyachtradar.mayara.ui.radar
 
 import android.app.Application
+import android.net.wifi.WifiManager
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -51,6 +52,13 @@ class RadarViewModel(application: Application) : AndroidViewModel(application) {
 
     private val unitsPreferences = UnitsPreferences(application.mayaraDataStore)
     private val connectionManager = ConnectionManager(application.mayaraDataStore)
+
+    /**
+     * Held while the embedded Rust server is running so the WiFi chip delivers
+     * multicast packets to our UDP sockets (required on Android — hardware filters
+     * multicast by default even with CHANGE_WIFI_MULTICAST_STATE permission).
+     */
+    private var multicastLock: WifiManager.MulticastLock? = null
 
     private val mdnsScanner: com.marineyachtradar.mayara.data.nsd.MdnsScanner = run {
         val nsdManager = application.getSystemService(android.net.nsd.NsdManager::class.java)
@@ -253,6 +261,7 @@ class RadarViewModel(application: Application) : AndroidViewModel(application) {
     private suspend fun connectWithMode(mode: ConnectionMode) {
         when (mode) {
             is ConnectionMode.Embedded -> {
+                acquireMulticastLock()
                 val started = try {
                     RadarJni.startServer(port = mode.port, emulator = mode.emulator)
                 } catch (e: UnsatisfiedLinkError) {
@@ -466,7 +475,37 @@ class RadarViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
+        releaseMulticastLock()
         repository.disconnect()
+    }
+
+    // ------------------------------------------------------------------
+    // WiFi multicast lock helpers
+    // ------------------------------------------------------------------
+
+    private fun acquireMulticastLock() {
+        if (multicastLock?.isHeld == true) return
+        val wifiManager = getApplication<Application>().applicationContext
+            .getSystemService(WifiManager::class.java)
+        if (wifiManager == null) {
+            Log.w(TAG, "WifiManager not available — multicast lock not acquired")
+            return
+        }
+        multicastLock = wifiManager.createMulticastLock("mayara_radar").also {
+            it.setReferenceCounted(false)
+            it.acquire()
+            Log.i(TAG, "WiFi multicast lock acquired")
+        }
+    }
+
+    private fun releaseMulticastLock() {
+        multicastLock?.let {
+            if (it.isHeld) {
+                it.release()
+                Log.i(TAG, "WiFi multicast lock released")
+            }
+        }
+        multicastLock = null
     }
 
     companion object {
