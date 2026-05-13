@@ -13,6 +13,10 @@ captures/
 # JNI output — rebuilt by scripts/build_jni.sh
 app/src/main/jniLibs/arm64-v8a/libradar.so
 
+# Debug keystore is intentionally tracked for consistent CI signing.
+# This is NOT a production release key.
+# !app/debug.keystore
+
 # Rust build artifacts
 mayara-jni/target/
 mayara-server/target/

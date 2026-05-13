@@ -26,6 +26,19 @@ android {
         }
     }
 
+    signingConfigs {
+        // Consistent debug key committed to the repo so that debug APKs from CI
+        // and local builds all share the same certificate.  This means a user can
+        // install subsequent debug builds on top of each other without uninstalling
+        // first.  This is NOT a production/release key.
+        create("debugKey") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -36,6 +49,7 @@ android {
         }
         debug {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debugKey")
         }
     }
 
